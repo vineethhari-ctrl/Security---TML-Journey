@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   AlertTriangle,
   ArrowUpRight,
@@ -13,6 +13,7 @@ import {
   Car,
   CheckCircle2,
   ChevronDown,
+  ChevronLeft,
   ChevronRight,
   ChevronUp,
   ClipboardList,
@@ -21,12 +22,16 @@ import {
   LogIn,
   LogOut,
   MapPin,
+  Pause,
+  Play,
   Radio,
   RotateCcw,
   Search,
   Send,
   ShieldAlert,
   Star,
+  Volume2,
+  VolumeX,
   X,
 } from 'lucide-react';
 import {
@@ -51,6 +56,65 @@ import {
   VisitFilterType,
   ZoneId,
 } from './types/tml';
+
+interface DemoStep {
+  stepNumber: number;
+  title: string;
+  caption: string;
+  durationMs: number;
+}
+
+const DEMO_STEPS: DemoStep[] = [
+  {
+    stepNumber: 1,
+    title: '1. Pan-India TML Hierarchy (5 Zones & 15 Regions)',
+    caption:
+      'TML regional managers can filter workshop security and reception telemetry across all 5 Pan-India Zones (South, West, North, East, Central), 15 Regional Offices, and individual dealerships.',
+    durationMs: 7500,
+  },
+  {
+    stepNumber: 2,
+    title: '2. Powertrain Segment & Date Controls (Overall / PV / EV)',
+    caption:
+      'Toggle seamlessly between Overall network volume, Passenger Vehicles (PV), and Electric Vehicles (EV), or inspect historical dates using the Calendar selector.',
+    durationMs: 7000,
+  },
+  {
+    stepNumber: 3,
+    title: '3. Live SLA Breach & RFID Notification Center',
+    caption:
+      'Tapping the top-right notification bell reveals real-time exception alerts—such as VIP vehicles inside the workshop beyond 3 days and daily RFID Gate-In compliance rates.',
+    durationMs: 7500,
+  },
+  {
+    stepNumber: 4,
+    title: '4. Today’s Network Summary & Workshop Counters',
+    caption:
+      'The 4 pastel summary tiles track Gate In, Gate Out, Road Test Out, and Road Test In counts, paired with live counters for Vehicles Inside Workshop and Active Road Tests.',
+    durationMs: 7500,
+  },
+  {
+    stepNumber: 5,
+    title: '5. TML Governance & RFID Auto-Gate Telemetry',
+    caption:
+      'Unlike the dealer guard app that uses QR/barcode scanner buttons, the TML portal tracks Governance Exceptions: Ageing > 48 Hours, VIP & Repeat Visits, RFID Auto-Gate vs Manual Scan compliance, and Active Road Tests > 20 mins.',
+    durationMs: 8500,
+  },
+  {
+    stepNumber: 6,
+    title: '6. Vehicle Movement Register & Security Guard Filter',
+    caption:
+      'Opening the Vehicle Movement Register displays every vehicle’s Gate In Time, Gate Out Time, Road Test Count, and Security Guard filter. Expanding a card reveals the trip-by-trip road test log.',
+    durationMs: 9000,
+  },
+  {
+    stepNumber: 7,
+    title: '7. Direct CSM & Dealer GM Delay Escalation',
+    caption:
+      'For any delayed or SLA-breached vehicle, TML managers can dispatch a priority escalation directly to the Dealership GM and Territory Customer Support Manager (CSM), logged in real time.',
+    durationMs: 8500,
+  },
+];
 
 function padTwoDigits(num: number): string {
   return String(Math.max(0, num)).padStart(2, '0');
@@ -124,6 +188,12 @@ export default function App() {
     string | null
   >(null);
 
+  // Interactive Guided Demo Tour State
+  const [isDemoPlaying, setIsDemoPlaying] = useState<boolean>(false);
+  const [demoStepIndex, setDemoStepIndex] = useState<number>(0);
+  const [voiceEnabled, setVoiceEnabled] = useState<boolean>(true);
+  const timerRef = useRef<number | null>(null);
+
   // Filtered Regions based on selected Zone
   const availableRegions = useMemo<RegionDefinition[]>(() => {
     if (selectedZone === 'ALL') {
@@ -171,8 +241,175 @@ export default function App() {
     setListDealerFilter(newDealer);
   };
 
+  // Speak Narration Helper using Web Speech API defensively
+  const speakCaption = (text: string, shouldSpeak: boolean) => {
+    if (typeof window === 'undefined' || !('speechSynthesis' in window)) {
+      return;
+    }
+    window.speechSynthesis.cancel();
+    if (!shouldSpeak) return;
+
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.rate = 1.02;
+    utterance.pitch = 1.0;
+    window.speechSynthesis.speak(utterance);
+  };
+
+  // Apply UI State for Each Guided Demo Step
+  const applyDemoStepState = (stepIdx: number) => {
+    const step = DEMO_STEPS[stepIdx];
+    if (!step) return;
+
+    speakCaption(step.caption, voiceEnabled);
+
+    switch (step.stepNumber) {
+      case 1: {
+        // Step 1: Pan-India Hierarchy on Home View
+        setEscalatingVehicle(null);
+        setActiveView('home');
+        setSelectedZone('ALL');
+        setSelectedRegion('ALL');
+        setSelectedDealer('ALL');
+        setCurrentSegment('Overall');
+        setShowToasts(false);
+        setShowRfidSheet(false);
+        break;
+      }
+      case 2: {
+        // Step 2: Segment & Date Controls
+        setEscalatingVehicle(null);
+        setActiveView('home');
+        setSelectedZone('SOUTH');
+        setSelectedRegion('South - Kerala');
+        setCurrentSegment('EV');
+        setShowToasts(false);
+        setShowRfidSheet(false);
+        break;
+      }
+      case 3: {
+        // Step 3: Live SLA & RFID Notification Center
+        setEscalatingVehicle(null);
+        setActiveView('home');
+        setCurrentSegment('Overall');
+        setShowToasts(true);
+        setShowRfidSheet(false);
+        break;
+      }
+      case 4: {
+        // Step 4: Today's Summary & Counters
+        setEscalatingVehicle(null);
+        setActiveView('home');
+        setShowToasts(false);
+        setShowRfidSheet(false);
+        break;
+      }
+      case 5: {
+        // Step 5: TML Governance & RFID Compliance Breakdown
+        setEscalatingVehicle(null);
+        setActiveView('home');
+        setShowToasts(false);
+        setShowRfidSheet(true);
+        break;
+      }
+      case 6: {
+        // Step 6: Vehicle Movement Register View
+        setEscalatingVehicle(null);
+        setShowToasts(false);
+        setShowRfidSheet(false);
+        setSelectedZone('SOUTH');
+        setSelectedRegion('South - Kerala');
+        setListDealerFilter('ALL');
+        setListGuardFilter('ALL');
+        setListVisitFilter('ALL');
+        setCurrentCategory('Vehicle Movement Register');
+        setExpandedVehicleIds({ 4: true, 1: true });
+        setActiveView('list');
+        break;
+      }
+      case 7: {
+        // Step 7: Escalation Modal on VIP Vehicle
+        setShowToasts(false);
+        setShowRfidSheet(false);
+        setSelectedZone('SOUTH');
+        setSelectedRegion('South - Kerala');
+        setCurrentCategory('Vehicles Inside Workshop');
+        setListVisitFilter('AGEING');
+        setActiveView('list');
+        const targetVehicle = (vehicles ?? []).find((v) => v.id === 2);
+        if (targetVehicle) {
+          setEscalatingVehicle(targetVehicle);
+          setEscalationPriority('Critical');
+          setEscalationNoteInput(
+            'SLA breach (3d 3hr inside). Expedite bay allocation & notify Customer Care.'
+          );
+        }
+        break;
+      }
+      default:
+        break;
+    }
+  };
+
+  // Auto-advance Guided Demo Timer
+  useEffect(() => {
+    if (!isDemoPlaying) {
+      if (timerRef.current) {
+        window.clearTimeout(timerRef.current);
+      }
+      return;
+    }
+
+    const currentStepObj = DEMO_STEPS[demoStepIndex];
+    const delay = currentStepObj?.durationMs ?? 7500;
+
+    timerRef.current = window.setTimeout(() => {
+      if (demoStepIndex < DEMO_STEPS.length - 1) {
+        const nextIdx = demoStepIndex + 1;
+        setDemoStepIndex(nextIdx);
+        applyDemoStepState(nextIdx);
+      } else {
+        setIsDemoPlaying(false);
+        setEscalatingVehicle(null);
+      }
+    }, delay);
+
+    return () => {
+      if (timerRef.current) {
+        window.clearTimeout(timerRef.current);
+      }
+    };
+  }, [isDemoPlaying, demoStepIndex, voiceEnabled]);
+
+  // Cleanup speech synthesis on unmount
+  useEffect(() => {
+    return () => {
+      if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+        window.speechSynthesis.cancel();
+      }
+    };
+  }, []);
+
+  const handleStartDemo = () => {
+    setDemoStepIndex(0);
+    setIsDemoPlaying(true);
+    applyDemoStepState(0);
+  };
+
+  const handleStopDemo = () => {
+    setIsDemoPlaying(false);
+    setEscalatingVehicle(null);
+    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
+    }
+  };
+
+  const handleStepJump = (newIdx: number) => {
+    const clamped = Math.max(0, Math.min(DEMO_STEPS.length - 1, newIdx));
+    setDemoStepIndex(clamped);
+    applyDemoStepState(clamped);
+  };
+
   // Compute KPI Numbers dynamically across Zones, Regions, and Dealerships
-  // Preserves exact baseline numbers when viewing South -> Kerala -> All Dealers
   const computedKpis = useMemo<KpiBreakdown>(() => {
     if (
       selectedZone === 'SOUTH' &&
@@ -257,7 +494,6 @@ export default function App() {
       if (selectedZone !== 'ALL' && v.zone !== selectedZone) return false;
       if (selectedRegion !== 'ALL' && v.region !== selectedRegion) return false;
 
-      // 'Gate In' and 'Vehicle Movement Register' display all gated-in movements for the scope
       if (
         currentCategory !== 'Gate In' &&
         currentCategory !== 'Vehicle Movement Register' &&
@@ -394,8 +630,81 @@ export default function App() {
   const isMovementRegisterView =
     currentCategory === 'Vehicle Movement Register';
 
+  const activeDemoStep = DEMO_STEPS[demoStepIndex] ?? DEMO_STEPS[0];
+
   return (
     <div className="min-h-screen bg-[#F2F4F7] text-[#111827] py-4 px-3 sm:px-6 flex flex-col items-center justify-start">
+      {/* Guided Interactive Demo Player Banner (Visible when Demo is Active) */}
+      {isDemoPlaying && activeDemoStep && (
+        <div className="w-full max-w-6xl mb-4 bg-[#111827] text-white rounded-2xl p-4 shadow-lg border border-white/10">
+          <div className="flex flex-wrap items-center justify-between gap-3 mb-2">
+            <div className="flex items-center gap-2">
+              <span className="px-2.5 py-0.5 rounded-full bg-[#007AFF] text-[11px] font-bold font-mono-tabular">
+                LIVE DEMO · STEP {activeDemoStep.stepNumber} OF{' '}
+                {DEMO_STEPS.length}
+              </span>
+              <h2 className="text-[14px] sm:text-[15px] font-bold text-white">
+                {activeDemoStep.title}
+              </h2>
+            </div>
+
+            <div className="flex items-center gap-1.5">
+              <button
+                type="button"
+                onClick={() => handleStepJump(demoStepIndex - 1)}
+                disabled={demoStepIndex === 0}
+                className="p-1.5 rounded-lg bg-white/10 hover:bg-white/20 disabled:opacity-40 cursor-pointer"
+                title="Previous Step"
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </button>
+              <button
+                type="button"
+                onClick={() => handleStepJump(demoStepIndex + 1)}
+                disabled={demoStepIndex === DEMO_STEPS.length - 1}
+                className="p-1.5 rounded-lg bg-white/10 hover:bg-white/20 disabled:opacity-40 cursor-pointer"
+                title="Next Step"
+              >
+                <ChevronRight className="w-4 h-4" />
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const nextVoice = !voiceEnabled;
+                  setVoiceEnabled(nextVoice);
+                  speakCaption(activeDemoStep.caption, nextVoice);
+                }}
+                className="px-2.5 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-[11px] font-semibold inline-flex items-center gap-1 cursor-pointer"
+                title="Toggle Voiceover Narration"
+              >
+                {voiceEnabled ? (
+                  <>
+                    <Volume2 className="w-3.5 h-3.5 text-[#10B981]" />
+                    <span>Voice ON</span>
+                  </>
+                ) : (
+                  <>
+                    <VolumeX className="w-3.5 h-3.5 text-white/60" />
+                    <span>Muted</span>
+                  </>
+                )}
+              </button>
+              <button
+                type="button"
+                onClick={handleStopDemo}
+                className="px-2.5 py-1.5 rounded-lg bg-[#DC2626] hover:bg-[#B91C1C] text-[11px] font-semibold inline-flex items-center gap-1 cursor-pointer"
+              >
+                <Pause className="w-3.5 h-3.5" />
+                <span>Stop Tour</span>
+              </button>
+            </div>
+          </div>
+          <p className="text-[13px] text-white/85 leading-relaxed">
+            {activeDemoStep.caption}
+          </p>
+        </div>
+      )}
+
       <div className="w-full max-w-6xl flex flex-col lg:flex-row items-center lg:items-start justify-center gap-8">
         {/* ================= MOBILE FRAME MATCHING FIGMA PROTOTYPE ================= */}
         <div className="w-full max-w-[412px] bg-white min-h-[860px] rounded-[28px] shadow-[0_12px_36px_rgba(0,0,0,0.12)] overflow-hidden flex flex-col relative shrink-0 border border-[#E5E7EB]">
@@ -784,7 +1093,7 @@ export default function App() {
                 </button>
               </div>
 
-              {/* Dedicated Card for Vehicle Movement Register (Matches Dealer & TML Journey Screen) */}
+              {/* Dedicated Card for Vehicle Movement Register */}
               <button
                 type="button"
                 onClick={() => openListView('Vehicle Movement Register')}
@@ -975,7 +1284,7 @@ export default function App() {
                 </button>
               </div>
 
-              {/* Compact Zone & Region Selector inside List View so user can switch Regions/Zones directly */}
+              {/* Compact Zone & Region Selector inside List View */}
               <div className="grid grid-cols-2 gap-2 mb-3">
                 <select
                   aria-label="Zone Filter in List View"
@@ -1090,7 +1399,7 @@ export default function App() {
                 ))}
               </div>
 
-              {/* Search & Filter Card (Matches Screenshot: Filter by Security Guard + Filter by Visit Type, plus Dealership scope) */}
+              {/* Search & Filter Card */}
               <div className="bg-white border border-[#E5E7EB] rounded-[20px] p-4 mb-5 shadow-[0_4px_14px_rgba(0,0,0,0.04)]">
                 <div className="bg-[#F3F4F6] rounded-full py-2.5 px-4 flex items-center gap-2.5 mb-3.5">
                   <Search className="w-4 h-4 text-[#6B7280] shrink-0" />
@@ -1113,7 +1422,7 @@ export default function App() {
                   )}
                 </div>
 
-                {/* Filter Row 1: Filter by Security Guard & Filter by Visit Type (Exact match to Vehicle Movement Register screenshot) */}
+                {/* Filter Row 1: Filter by Security Guard & Filter by Visit Type */}
                 <div className="grid grid-cols-2 gap-3 mb-3">
                   <div>
                     <label
@@ -1194,7 +1503,7 @@ export default function App() {
                 </button>
               </div>
 
-              {/* Vehicle List Meta Header (Matches "25 May 26   3 Gate In" in Screenshot) */}
+              {/* Vehicle List Meta Header */}
               <div className="flex justify-between items-center text-[14px] font-bold text-[#111827] mb-3 font-mono-tabular">
                 <span>{selectedDate}</span>
                 <span>
@@ -1238,7 +1547,6 @@ export default function App() {
                         key={v.id}
                         className="bg-white border border-[#E5E7EB] rounded-[18px] p-4 mb-3 shadow-[0_2px_8px_rgba(0,0,0,0.03)]"
                       >
-                        {/* Dealership & Region Sub-header for TML Multi-Dealer Visibility */}
                         <div className="flex items-center justify-between mb-2">
                           <span className="text-[11px] font-semibold text-[#4B5563] bg-[#F3F4F6] py-[3px] px-2 rounded-[6px] inline-flex items-center gap-1">
                             <Building2 className="w-3 h-3 text-[#6B7280]" />
@@ -1249,7 +1557,6 @@ export default function App() {
                           </span>
                         </div>
 
-                        {/* Top Section of Card */}
                         <div className="flex justify-between items-start gap-2">
                           <div>
                             <div className="text-[16px] font-bold text-[#111827] mb-0.5 font-mono-tabular">
@@ -1304,7 +1611,6 @@ export default function App() {
                               </button>
                             </div>
 
-                            {/* Road Test Count & Dwell Time on Right */}
                             <div className="text-right mt-2">
                               <div className="text-[12px] text-[#374151] font-medium">
                                 Road Test Count:{' '}
@@ -1330,7 +1636,7 @@ export default function App() {
                           </div>
                         </div>
 
-                        {/* Bottom Dual Timestamp Row (Gate In Time on Left, Gate Out Time on Right — Exact match to Screenshot) */}
+                        {/* Bottom Dual Timestamp Row */}
                         <div className="mt-3 pt-2.5 border-t border-[#F3F4F6] flex items-center justify-between gap-2">
                           <div>
                             <div className="text-[11px] text-[#6B7280]">
@@ -1393,7 +1699,6 @@ export default function App() {
                               </div>
                             </div>
 
-                            {/* Road Test Movement Breakdown */}
                             {(v.roadTestTrips ?? []).length > 0 && (
                               <div className="mb-2.5 bg-[#F9FAFB] p-2.5 rounded-[10px] border border-[#E5E7EB]">
                                 <div className="text-[11px] font-bold text-[#374151] mb-1.5 flex items-center justify-between">
@@ -1419,8 +1724,13 @@ export default function App() {
                                           · {trip.driver}
                                         </span>
                                         <div className="text-[10px] text-[#6B7280] font-mono-tabular">
-                                          Out: {trip.outTime.split('|')[1]?.trim() ?? trip.outTime}{' '}
-                                          → In: {trip.inTime.includes('|') ? trip.inTime.split('|')[1]?.trim() : trip.inTime}
+                                          Out:{' '}
+                                          {trip.outTime.split('|')[1]?.trim() ??
+                                            trip.outTime}{' '}
+                                          → In:{' '}
+                                          {trip.inTime.includes('|')
+                                            ? trip.inTime.split('|')[1]?.trim()
+                                            : trip.inTime}
                                         </div>
                                       </div>
                                       <span className="font-mono-tabular font-semibold text-[#374151]">
@@ -1487,7 +1797,10 @@ export default function App() {
                   : 'text-[#6B7280] hover:text-[#111827]'
               }`}
             >
-              <Home className="w-5 h-5" strokeWidth={activeView === 'home' ? 2.4 : 1.8} />
+              <Home
+                className="w-5 h-5"
+                strokeWidth={activeView === 'home' ? 2.4 : 1.8}
+              />
               <span className="text-[10px]">Home</span>
             </button>
 
@@ -1591,13 +1904,38 @@ export default function App() {
                   TML Security, Reception &amp; Movement Register
                 </h1>
               </div>
-              <div className="flex items-center gap-2 text-[12px] font-semibold text-[#374151] bg-[#F3F4F6] px-3.5 py-2 rounded-xl font-mono-tabular">
-                <span>Zone:</span>
-                <strong className="text-[#111827]">{selectedZone}</strong>
-                <span>·</span>
-                <span>
-                  {selectedRegion === 'ALL' ? 'All Regions' : selectedRegion}
-                </span>
+
+              <div className="flex items-center gap-2 flex-wrap">
+                <button
+                  type="button"
+                  onClick={isDemoPlaying ? handleStopDemo : handleStartDemo}
+                  className={`px-4 py-2 rounded-xl text-[12px] font-bold inline-flex items-center gap-1.5 cursor-pointer transition-colors ${
+                    isDemoPlaying
+                      ? 'bg-[#DC2626] text-white hover:bg-[#B91C1C]'
+                      : 'bg-[#007AFF] text-white hover:bg-[#0062CC]'
+                  }`}
+                >
+                  {isDemoPlaying ? (
+                    <>
+                      <Pause className="w-3.5 h-3.5" />
+                      <span>Stop Auto-Demo</span>
+                    </>
+                  ) : (
+                    <>
+                      <Play className="w-3.5 h-3.5" />
+                      <span>Play Guided Demo Tour</span>
+                    </>
+                  )}
+                </button>
+
+                <div className="flex items-center gap-2 text-[12px] font-semibold text-[#374151] bg-[#F3F4F6] px-3.5 py-2 rounded-xl font-mono-tabular">
+                  <span>Zone:</span>
+                  <strong className="text-[#111827]">{selectedZone}</strong>
+                  <span>·</span>
+                  <span>
+                    {selectedRegion === 'ALL' ? 'All Regions' : selectedRegion}
+                  </span>
+                </div>
               </div>
             </div>
 
