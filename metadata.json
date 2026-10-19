@@ -1,0 +1,6 @@
+{
+  "name": "TATA.CARS | TML Security & Reception Journey",
+  "description": "Tata Motors Limited (TML) regional governance portal for dealership workshop gate-in/out tracking, RFID compliance monitoring, road test telemetry, and SLA breach escalation.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
