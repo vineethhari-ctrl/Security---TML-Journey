@@ -6,7 +6,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   AlertTriangle,
-  ArrowUpRight,
+  ArrowLeft,
   Bell,
   Building2,
   Calendar,
@@ -19,8 +19,6 @@ import {
   ClipboardList,
   Clock,
   Home,
-  LogIn,
-  LogOut,
   MapPin,
   Pause,
   Play,
@@ -30,6 +28,7 @@ import {
   Send,
   ShieldAlert,
   Star,
+  UserCheck,
   Volume2,
   VolumeX,
   X,
@@ -38,7 +37,6 @@ import {
   AVAILABLE_DATES,
   BASELINE_SOUTH_KPIS,
   DEALER_COMPLIANCE_METRICS,
-  INITIAL_TOAST_ALERTS,
   INITIAL_VEHICLES,
   SECURITY_GUARDS,
   TML_REGIONS,
@@ -50,7 +48,6 @@ import {
   KpiBreakdown,
   RegionDefinition,
   SegmentType,
-  ToastAlertItem,
   VehicleCategory,
   VehicleRecord,
   VisitFilterType,
@@ -67,52 +64,45 @@ interface DemoStep {
 const DEMO_STEPS: DemoStep[] = [
   {
     stepNumber: 1,
-    title: '1. Pan-India TML Hierarchy (5 Zones & 15 Regions)',
+    title: '1. Pan-India TML Web Portal (All 5 Zones & 15 Regions)',
     caption:
-      'TML regional managers can filter workshop security and reception telemetry across all 5 Pan-India Zones (South, West, North, East, Central), 15 Regional Offices, and individual dealerships.',
+      'Welcome to the TATA.CARS TML Security and Reception Web Portal. TML managers can filter live workshop telemetry across all 5 Pan-India Zones—South, West, North, East, and Central—15 Regional Offices, and individual dealerships.',
     durationMs: 7500,
   },
   {
     stepNumber: 2,
     title: '2. Powertrain Segment & Date Controls (Overall / PV / EV)',
     caption:
-      'Toggle seamlessly between Overall network volume, Passenger Vehicles (PV), and Electric Vehicles (EV), or inspect historical dates using the Calendar selector.',
+      'Switch seamlessly between Overall volume, Passenger Vehicles (PV), and Electric Vehicles (EV), or inspect historical dates using the Calendar selector.',
     durationMs: 7000,
   },
   {
     stepNumber: 3,
-    title: '3. Live SLA Breach & RFID Notification Center',
+    title: '3. Live RFID Gate-In / Gate-Out & SLA Alert Banners',
     caption:
-      'Tapping the top-right notification bell reveals real-time exception alerts—such as VIP vehicles inside the workshop beyond 3 days and daily RFID Gate-In compliance rates.',
+      'Clicking the top-right notification bell reveals real-time RFID Gate-In and Gate-Out notifications alongside VIP workshop SLA breach alerts.',
     durationMs: 7500,
   },
   {
     stepNumber: 4,
-    title: '4. Today’s Network Summary & Workshop Counters',
+    title: '4. Today’s Summary & Dealership-Wise Web Dashboard',
     caption:
-      'The 4 pastel summary tiles track Gate In, Gate Out, Road Test Out, and Road Test In counts, paired with live counters for Vehicles Inside Workshop and Active Road Tests.',
-    durationMs: 7500,
+      'Today’s Summary displays the 4 core gate and road-test tiles (Gate In, Gate Out, Road Test Out, Road Test In), plus active counters for Vehicles Inside Workshop and Active Road Tests, followed by the Dealership Summary & Compliance Matrix.',
+    durationMs: 8000,
   },
   {
     stepNumber: 5,
-    title: '5. TML Governance & RFID Auto-Gate Telemetry',
+    title: '5. Vehicle Movement Register & Security Guard Filter',
     caption:
-      'Unlike the dealer guard app that uses QR/barcode scanner buttons, the TML portal tracks Governance Exceptions: Ageing > 48 Hours, VIP & Repeat Visits, RFID Auto-Gate vs Manual Scan compliance, and Active Road Tests > 20 mins.',
+      'Opening the Vehicle Movement Register from the top web navigation bar allows filtering by Security Guard, Visit Type (Appointment, Walk In, VIP, Repeat Visit), or Dealership, displaying Road Test Count and Gate-In / Gate-Out timestamps.',
     durationMs: 8500,
   },
   {
     stepNumber: 6,
-    title: '6. Vehicle Movement Register & Security Guard Filter',
+    title: '6. Direct CSM & Dealer GM Delay Escalation',
     caption:
-      'Opening the Vehicle Movement Register displays every vehicle’s Gate In Time, Gate Out Time, Road Test Count, and Security Guard filter. Expanding a card reveals the trip-by-trip road test log.',
-    durationMs: 9000,
-  },
-  {
-    stepNumber: 7,
-    title: '7. Direct CSM & Dealer GM Delay Escalation',
-    caption:
-      'For any delayed or SLA-breached vehicle, TML managers can dispatch a priority escalation directly to the Dealership GM and Territory Customer Support Manager (CSM), logged in real time.',
-    durationMs: 8500,
+      'For any delayed or SLA-breached vehicle, TML managers can expand the audit drawer and dispatch a priority escalation directly to the Dealership GM and Territory CSM.',
+    durationMs: 8000,
   },
 ];
 
@@ -121,11 +111,11 @@ function padTwoDigits(num: number): string {
 }
 
 export default function App() {
-  // Core Navigation & View State
+  // Core Web Navigation & View State
   const [activeView, setActiveView] = useState<'home' | 'list'>('home');
   const [currentSegment, setCurrentSegment] = useState<SegmentType>('Overall');
   const [currentCategory, setCurrentCategory] = useState<VehicleCategory>(
-    'Vehicle Movement Register'
+    'Vehicles Inside Workshop'
   );
 
   // Pan-India TML Hierarchy State (Zone -> Region -> Dealership)
@@ -149,14 +139,10 @@ export default function App() {
   // Expanded Audit Drawers on Vehicle Cards
   const [expandedVehicleIds, setExpandedVehicleIds] = useState<
     Record<number, boolean>
-  >({ 4: true, 1: true });
+  >({ 1: true, 4: true });
 
-  // Live Notifications / Toast Banner State
-  const [showToasts, setShowToasts] = useState<boolean>(false);
-  const [toasts, setToasts] = useState<ToastAlertItem[]>(INITIAL_TOAST_ALERTS);
-
-  // RFID Compliance Sheet State
-  const [showRfidSheet, setShowRfidSheet] = useState<boolean>(false);
+  // Live RFID & SLA Notifications Banner State
+  const [showRfidBanners, setShowRfidBanners] = useState<boolean>(false);
 
   // Vehicles & Escalations State
   const [vehicles, setVehicles] = useState<VehicleRecord[]>(INITIAL_VEHICLES);
@@ -177,7 +163,7 @@ export default function App() {
     },
   ]);
 
-  // Active Escalation Dialog State (replaces window.alert)
+  // Active Escalation Dialog State
   const [escalatingVehicle, setEscalatingVehicle] =
     useState<VehicleRecord | null>(null);
   const [escalationNoteInput, setEscalationNoteInput] = useState<string>('');
@@ -241,7 +227,7 @@ export default function App() {
     setListDealerFilter(newDealer);
   };
 
-  // Speak Narration Helper using Web Speech API defensively
+  // Speak Narration Helper using Web Speech API
   const speakCaption = (text: string, shouldSpeak: boolean) => {
     if (typeof window === 'undefined' || !('speechSynthesis' in window)) {
       return;
@@ -264,58 +250,40 @@ export default function App() {
 
     switch (step.stepNumber) {
       case 1: {
-        // Step 1: Pan-India Hierarchy on Home View
         setEscalatingVehicle(null);
         setActiveView('home');
         setSelectedZone('ALL');
         setSelectedRegion('ALL');
         setSelectedDealer('ALL');
         setCurrentSegment('Overall');
-        setShowToasts(false);
-        setShowRfidSheet(false);
+        setShowRfidBanners(false);
         break;
       }
       case 2: {
-        // Step 2: Segment & Date Controls
         setEscalatingVehicle(null);
         setActiveView('home');
         setSelectedZone('SOUTH');
         setSelectedRegion('South - Kerala');
         setCurrentSegment('EV');
-        setShowToasts(false);
-        setShowRfidSheet(false);
+        setShowRfidBanners(false);
         break;
       }
       case 3: {
-        // Step 3: Live SLA & RFID Notification Center
         setEscalatingVehicle(null);
         setActiveView('home');
         setCurrentSegment('Overall');
-        setShowToasts(true);
-        setShowRfidSheet(false);
+        setShowRfidBanners(true);
         break;
       }
       case 4: {
-        // Step 4: Today's Summary & Counters
         setEscalatingVehicle(null);
         setActiveView('home');
-        setShowToasts(false);
-        setShowRfidSheet(false);
+        setShowRfidBanners(false);
         break;
       }
       case 5: {
-        // Step 5: TML Governance & RFID Compliance Breakdown
         setEscalatingVehicle(null);
-        setActiveView('home');
-        setShowToasts(false);
-        setShowRfidSheet(true);
-        break;
-      }
-      case 6: {
-        // Step 6: Vehicle Movement Register View
-        setEscalatingVehicle(null);
-        setShowToasts(false);
-        setShowRfidSheet(false);
+        setShowRfidBanners(false);
         setSelectedZone('SOUTH');
         setSelectedRegion('South - Kerala');
         setListDealerFilter('ALL');
@@ -326,10 +294,8 @@ export default function App() {
         setActiveView('list');
         break;
       }
-      case 7: {
-        // Step 7: Escalation Modal on VIP Vehicle
-        setShowToasts(false);
-        setShowRfidSheet(false);
+      case 6: {
+        setShowRfidBanners(false);
         setSelectedZone('SOUTH');
         setSelectedRegion('South - Kerala');
         setCurrentCategory('Vehicles Inside Workshop');
@@ -380,7 +346,6 @@ export default function App() {
     };
   }, [isDemoPlaying, demoStepIndex, voiceEnabled]);
 
-  // Cleanup speech synthesis on unmount
   useEffect(() => {
     return () => {
       if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
@@ -470,6 +435,93 @@ export default function App() {
     vehicles,
   ]);
 
+  // Compute Dealership-wise 6-metric summary cards for the active Zone & Region
+  const dealerSummaryCards = useMemo(() => {
+    const dealersToRender =
+      selectedDealer === 'ALL' ? availableDealers : [selectedDealer];
+
+    return (dealersToRender ?? []).map((dealerName) => {
+      const dVehicles = (vehicles ?? []).filter(
+        (v) =>
+          v.dealer === dealerName &&
+          (currentSegment === 'Overall' || v.segment === currentSegment)
+      );
+      const complianceMeta = (DEALER_COMPLIANCE_METRICS ?? []).find(
+        (m) => m.dealer === dealerName
+      );
+      const regionObj = (TML_REGIONS ?? []).find((r) =>
+        (r.dealers ?? []).includes(dealerName)
+      );
+
+      if (
+        currentSegment === 'Overall' &&
+        dealerName === 'KVR Motors - Thrissur'
+      ) {
+        return {
+          name: dealerName,
+          region: regionObj?.name ?? 'Kerala (RO Kochi)',
+          zone: regionObj?.zone ?? 'SOUTH',
+          csmLead: complianceMeta?.csmLead ?? 'Vivek Nair',
+          gateIn: '02',
+          gateOut: '02',
+          rtOut: '01',
+          rtIn: '01',
+          inside: '02',
+          activeRt: '01',
+          compliancePct: complianceMeta?.compliancePct ?? 96,
+        };
+      }
+      if (
+        currentSegment === 'Overall' &&
+        dealerName === 'Focuz Cars - Kochi'
+      ) {
+        return {
+          name: dealerName,
+          region: regionObj?.name ?? 'Kerala (RO Kochi)',
+          zone: regionObj?.zone ?? 'SOUTH',
+          csmLead: complianceMeta?.csmLead ?? 'Vivek Nair',
+          gateIn: '02',
+          gateOut: '01',
+          rtOut: '02',
+          rtIn: '02',
+          inside: '01',
+          activeRt: '01',
+          compliancePct: complianceMeta?.compliancePct ?? 86,
+        };
+      }
+
+      const insideCount = dVehicles.filter(
+        (v) => v.category === 'Vehicles Inside Workshop'
+      ).length;
+      const gateOutCount = dVehicles.filter(
+        (v) => v.category === 'Gate Out'
+      ).length;
+      const rtOutCount = dVehicles.filter(
+        (v) => v.category === 'Road Test Out'
+      ).length;
+      const rtInCount = dVehicles.filter(
+        (v) => v.category === 'Road Test In'
+      ).length;
+      const activeRtCount = dVehicles.filter(
+        (v) => v.category === 'Active Road Tests'
+      ).length;
+
+      return {
+        name: dealerName,
+        region: regionObj?.name ?? 'Regional Office',
+        zone: regionObj?.zone ?? 'SOUTH',
+        csmLead: complianceMeta?.csmLead ?? 'Regional CSM',
+        gateIn: padTwoDigits(Math.max(1, dVehicles.length)),
+        gateOut: padTwoDigits(gateOutCount),
+        rtOut: padTwoDigits(rtOutCount),
+        rtIn: padTwoDigits(rtInCount),
+        inside: padTwoDigits(insideCount),
+        activeRt: padTwoDigits(activeRtCount),
+        compliancePct: complianceMeta?.compliancePct ?? 93,
+      };
+    });
+  }, [availableDealers, selectedDealer, vehicles, currentSegment]);
+
   // Open Drill-down or Movement Register View
   const openListView = (
     category: VehicleCategory,
@@ -481,12 +533,11 @@ export default function App() {
     setActiveView('list');
   };
 
-  // Close Drill-down List View
   const closeListView = () => {
     setActiveView('home');
   };
 
-  // Filtered Vehicles for List View & Vehicle Movement Register
+  // Filtered Vehicles for Drill-Down List View & Vehicle Movement Register
   const filteredVehicles = useMemo<VehicleRecord[]>(() => {
     const query = (searchQuery ?? '').trim().toLowerCase();
 
@@ -542,7 +593,6 @@ export default function App() {
     searchQuery,
   ]);
 
-  // Toggle Vehicle Audit Drawer
   const toggleAuditDrawer = (id: number) => {
     setExpandedVehicleIds((prev) => ({
       ...prev,
@@ -550,7 +600,6 @@ export default function App() {
     }));
   };
 
-  // Open Escalation Confirmation Modal
   const handleInitiateEscalation = (vehicle: VehicleRecord) => {
     setEscalatingVehicle(vehicle);
     setEscalationPriority(
@@ -563,7 +612,6 @@ export default function App() {
     );
   };
 
-  // Confirm & Dispatch Escalation to Dealership CSM
   const handleConfirmEscalation = (e: React.FormEvent) => {
     e.preventDefault();
     if (!escalatingVehicle) return;
@@ -601,242 +649,442 @@ export default function App() {
     };
     setEscalationLogs((prev) => [newEntry, ...(prev ?? [])]);
 
-    const newToast: ToastAlertItem = {
-      id: `toast-esc-${Date.now()}`,
-      type: 'escalation',
-      title: `Escalated: ${escalatingVehicle.reg} (${escalationPriority})`,
-      sub: `Sent to Dealer GM at ${escalatingVehicle.dealer} & ${escalatingVehicle.csmName}`,
-      time: 'Just now',
-      vehicleId: escalatingVehicle.id,
-      categoryTarget: escalatingVehicle.category,
-    };
-    setToasts((prev) => [newToast, ...(prev ?? [])]);
-
     setRecentEscalationBanner(
       `Escalation sent to Dealer GM at ${escalatingVehicle.dealer} for vehicle ${escalatingVehicle.reg}`
     );
     setEscalatingVehicle(null);
   };
 
-  // Filtered Dealer Compliance Metrics for current Zone & Region
-  const scopedComplianceList = useMemo(() => {
-    return (DEALER_COMPLIANCE_METRICS ?? []).filter((m) => {
-      if (selectedZone !== 'ALL' && m.zone !== selectedZone) return false;
-      if (selectedRegion !== 'ALL' && m.region !== selectedRegion) return false;
-      return true;
-    });
-  }, [selectedZone, selectedRegion]);
-
   const isMovementRegisterView =
     currentCategory === 'Vehicle Movement Register';
-
   const activeDemoStep = DEMO_STEPS[demoStepIndex] ?? DEMO_STEPS[0];
 
   return (
-    <div className="min-h-screen bg-[#F2F4F7] text-[#111827] py-4 px-3 sm:px-6 flex flex-col items-center justify-start">
-      {/* Guided Interactive Demo Player Banner (Visible when Demo is Active) */}
-      {isDemoPlaying && activeDemoStep && (
-        <div className="w-full max-w-6xl mb-4 bg-[#111827] text-white rounded-2xl p-4 shadow-lg border border-white/10">
-          <div className="flex flex-wrap items-center justify-between gap-3 mb-2">
-            <div className="flex items-center gap-2">
-              <span className="px-2.5 py-0.5 rounded-full bg-[#007AFF] text-[11px] font-bold font-mono-tabular">
-                LIVE DEMO · STEP {activeDemoStep.stepNumber} OF{' '}
-                {DEMO_STEPS.length}
-              </span>
-              <h2 className="text-[14px] sm:text-[15px] font-bold text-white">
-                {activeDemoStep.title}
-              </h2>
-            </div>
-
-            <div className="flex items-center gap-1.5">
-              <button
-                type="button"
-                onClick={() => handleStepJump(demoStepIndex - 1)}
-                disabled={demoStepIndex === 0}
-                className="p-1.5 rounded-lg bg-white/10 hover:bg-white/20 disabled:opacity-40 cursor-pointer"
-                title="Previous Step"
-              >
-                <ChevronLeft className="w-4 h-4" />
-              </button>
-              <button
-                type="button"
-                onClick={() => handleStepJump(demoStepIndex + 1)}
-                disabled={demoStepIndex === DEMO_STEPS.length - 1}
-                className="p-1.5 rounded-lg bg-white/10 hover:bg-white/20 disabled:opacity-40 cursor-pointer"
-                title="Next Step"
-              >
-                <ChevronRight className="w-4 h-4" />
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  const nextVoice = !voiceEnabled;
-                  setVoiceEnabled(nextVoice);
-                  speakCaption(activeDemoStep.caption, nextVoice);
-                }}
-                className="px-2.5 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-[11px] font-semibold inline-flex items-center gap-1 cursor-pointer"
-                title="Toggle Voiceover Narration"
-              >
-                {voiceEnabled ? (
-                  <>
-                    <Volume2 className="w-3.5 h-3.5 text-[#10B981]" />
-                    <span>Voice ON</span>
-                  </>
-                ) : (
-                  <>
-                    <VolumeX className="w-3.5 h-3.5 text-white/60" />
-                    <span>Muted</span>
-                  </>
-                )}
-              </button>
-              <button
-                type="button"
-                onClick={handleStopDemo}
-                className="px-2.5 py-1.5 rounded-lg bg-[#DC2626] hover:bg-[#B91C1C] text-[11px] font-semibold inline-flex items-center gap-1 cursor-pointer"
-              >
-                <Pause className="w-3.5 h-3.5" />
-                <span>Stop Tour</span>
-              </button>
-            </div>
-          </div>
-          <p className="text-[13px] text-white/85 leading-relaxed">
-            {activeDemoStep.caption}
-          </p>
-        </div>
-      )}
-
-      <div className="w-full max-w-6xl flex flex-col lg:flex-row items-center lg:items-start justify-center gap-8">
-        {/* ================= MOBILE FRAME MATCHING FIGMA PROTOTYPE ================= */}
-        <div className="w-full max-w-[412px] bg-white min-h-[860px] rounded-[28px] shadow-[0_12px_36px_rgba(0,0,0,0.12)] overflow-hidden flex flex-col relative shrink-0 border border-[#E5E7EB]">
-          {/* Live RFID & SLA Exception Notifications (Tap Bell Icon to Toggle) */}
-          {showToasts && (
-            <div className="px-4 pt-3 pb-2 flex flex-col gap-2 bg-[#F9FAFB] border-b border-[#E5E7EB]">
-              <div className="flex items-center justify-between">
-                <span className="text-[11px] font-bold text-[#4B5563] tracking-tight">
-                  Live Network Alerts ({(toasts ?? []).length})
-                </span>
-                <button
-                  type="button"
-                  onClick={() => setShowToasts(false)}
-                  className="text-[11px] font-semibold text-[#6B7280] hover:text-[#111827] px-1.5 py-0.5 cursor-pointer"
-                >
-                  Dismiss
-                </button>
-              </div>
-              {(toasts ?? []).map((t) => (
-                <div
-                  key={t.id}
-                  onClick={() => {
-                    if (t.categoryTarget) {
-                      openListView(t.categoryTarget, t.filterTarget ?? 'ALL');
-                      setShowToasts(false);
-                    }
-                  }}
-                  className={`bg-white border rounded-[14px] p-3 shadow-[0_4px_12px_rgba(0,0,0,0.05)] flex justify-between items-start gap-2 transition-colors ${
-                    t.type === 'rfid'
-                      ? 'border-[#10B981]/40 bg-[#ECFDF5]/20'
-                      : t.type === 'escalation'
-                      ? 'border-[#007AFF]/40 bg-[#EFF6FF]/30'
-                      : 'border-[#DC2626]/40 bg-[#FEF2F2]/20'
-                  } ${t.categoryTarget ? 'cursor-pointer hover:bg-[#F9FAFB]' : ''}`}
-                >
-                  <div className="flex items-start gap-2.5">
-                    <span
-                      className={`mt-1 w-2 h-2 rounded-full shrink-0 ${
-                        t.type === 'rfid'
-                          ? 'bg-[#10B981]'
-                          : t.type === 'escalation'
-                          ? 'bg-[#007AFF]'
-                          : 'bg-[#DC2626]'
-                      }`}
-                    />
-                    <div>
-                      <div className="text-[13px] font-bold text-[#111827] mb-0.5">
-                        {t.title}
-                      </div>
-                      <div className="text-[12px] text-[#6B7280]">{t.sub}</div>
-                    </div>
-                  </div>
-                  <div className="text-[11px] text-[#6B7280] whitespace-nowrap shrink-0 font-mono-tabular">
-                    {t.time}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {/* Top Header matching Figma */}
-          <header className="flex items-center justify-between px-[18px] pt-4 pb-3 border-b border-[#E5E7EB] relative bg-white">
-            <div className="absolute bottom-[-1px] left-0 w-[55%] h-[3px] bg-black" />
-
+    <div className="min-h-screen bg-[#F2F4F7] text-[#111827] flex flex-col">
+      {/* ================= TOP WEB PORTAL HEADER BAR ================= */}
+      <header className="sticky top-0 z-30 bg-white border-b border-[#E5E7EB]">
+        <div className="max-w-7xl mx-auto px-4 sm:px-8 py-3.5 flex items-center justify-between gap-6 relative">
+          {/* Brand Zone */}
+          <div className="flex items-center gap-3 shrink-0">
             <button
               type="button"
-              onClick={() => closeListView()}
-              title="Return to TML Home Dashboard"
-              className="relative w-10 h-10 cursor-pointer text-left shrink-0"
+              onClick={closeListView}
+              className="relative w-10 h-10 cursor-pointer shrink-0"
+              title="TML Portal Home"
             >
-              <div className="w-10 h-10 rounded-full bg-[#1F2937] text-white font-bold text-[14px] flex items-center justify-center">
+              <div className="w-10 h-10 rounded-full bg-[#1F2937] text-white font-bold text-xs flex items-center justify-center">
                 VH
               </div>
-              <span className="absolute -top-[1px] -right-[1px] w-3 h-3 rounded-full bg-[#16A34A] border-2 border-white" />
+              <span className="absolute -top-0.5 -right-0.5 w-3 h-3 bg-[#16A34A] border-2 border-white rounded-full" />
             </button>
+            <button
+              type="button"
+              onClick={closeListView}
+              className="text-left cursor-pointer"
+            >
+              <div className="text-base font-extrabold tracking-wide text-black whitespace-nowrap">
+                TATA.CARS <span className="font-normal text-gray-400 mx-1">|</span>{' '}
+                <span className="italic font-semibold">TML Portal</span>
+              </div>
+            </button>
+          </div>
 
-            <div className="text-[15px] font-extrabold tracking-[0.4px] text-black whitespace-nowrap shrink-0">
-              TATA.CARS |{' '}
-              <span className="font-semibold italic text-[#111111] ml-1">
-                TML Portal
-              </span>
-            </div>
+          {/* Primary Web Navigation Links */}
+          <nav className="hidden lg:flex items-center gap-6 text-sm font-semibold text-[#4B5563]">
+            <button
+              type="button"
+              onClick={closeListView}
+              className={`py-1 border-b-2 transition-colors cursor-pointer whitespace-nowrap shrink-0 ${
+                activeView === 'home'
+                  ? 'border-black text-black'
+                  : 'border-transparent hover:text-black'
+              }`}
+            >
+              Dashboard Overview
+            </button>
+            <button
+              type="button"
+              onClick={() => openListView('Vehicle Movement Register')}
+              className={`py-1 border-b-2 transition-colors cursor-pointer whitespace-nowrap shrink-0 ${
+                activeView === 'list' &&
+                currentCategory === 'Vehicle Movement Register'
+                  ? 'border-black text-black'
+                  : 'border-transparent hover:text-black'
+              }`}
+            >
+              Vehicle Movement Register
+            </button>
+            <button
+              type="button"
+              onClick={() => openListView('Vehicles Inside Workshop')}
+              className={`py-1 border-b-2 transition-colors cursor-pointer whitespace-nowrap shrink-0 ${
+                activeView === 'list' &&
+                currentCategory === 'Vehicles Inside Workshop'
+                  ? 'border-black text-black'
+                  : 'border-transparent hover:text-black'
+              }`}
+            >
+              Inside Workshop ({computedKpis.inside})
+            </button>
+            <button
+              type="button"
+              onClick={() => openListView('Active Road Tests')}
+              className={`py-1 border-b-2 transition-colors cursor-pointer whitespace-nowrap shrink-0 ${
+                activeView === 'list' && currentCategory === 'Active Road Tests'
+                  ? 'border-black text-black'
+                  : 'border-transparent hover:text-black'
+              }`}
+            >
+              Active Road Tests ({computedKpis.activeRt})
+            </button>
+          </nav>
+
+          {/* Right Action Controls */}
+          <div className="flex items-center gap-2.5 shrink-0">
+            <button
+              type="button"
+              onClick={isDemoPlaying ? handleStopDemo : handleStartDemo}
+              className={`px-4 py-2 rounded-full text-xs font-bold inline-flex items-center gap-1.5 cursor-pointer transition-colors whitespace-nowrap shrink-0 ${
+                isDemoPlaying
+                  ? 'bg-[#DC2626] text-white hover:bg-[#B91C1C]'
+                  : 'bg-[#007AFF] text-white hover:bg-[#0062CC]'
+              }`}
+            >
+              {isDemoPlaying ? (
+                <>
+                  <Pause className="w-3.5 h-3.5" />
+                  <span>Stop Tour</span>
+                </>
+              ) : (
+                <>
+                  <Play className="w-3.5 h-3.5" />
+                  <span>Play Guided Demo</span>
+                </>
+              )}
+            </button>
 
             <button
               type="button"
-              onClick={() => setShowToasts((prev) => !prev)}
-              title="Toggle Live SLA & RFID Alerts"
-              aria-label="Toggle Alerts"
-              className="relative p-2 rounded-full hover:bg-[#F3F4F6] transition-colors cursor-pointer min-w-[40px] min-h-[40px] flex items-center justify-center"
+              onClick={() => setShowRfidBanners((prev) => !prev)}
+              className="relative p-2 rounded-full hover:bg-gray-100 text-gray-800 cursor-pointer"
+              title="Toggle RFID & SLA Notifications"
+              aria-label="Toggle Notifications"
             >
-              <Bell
-                className="w-[22px] h-[22px] text-[#111827]"
-                strokeWidth={2}
-              />
+              <Bell className="w-5 h-5" />
               <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-[#DC2626] rounded-full" />
             </button>
-          </header>
+          </div>
+        </div>
+      </header>
 
-          {/* In-app Escalation Confirmation Banner */}
-          {recentEscalationBanner && (
-            <div className="mx-4 mt-3 px-3.5 py-2.5 rounded-xl bg-[#ECFDF5] border border-[#10B981] flex items-center justify-between gap-2">
-              <div className="flex items-center gap-2 text-[12px] font-semibold text-[#065F46]">
-                <CheckCircle2 className="w-4 h-4 text-[#059669] shrink-0" />
-                <span>{recentEscalationBanner}</span>
+      {/* ================= MAIN FULL-WIDTH WEB WORKSPACE ================= */}
+      <main className="w-full max-w-7xl mx-auto px-4 sm:px-8 py-6 flex-1">
+        {/* Guided Demo Player Banner */}
+        {isDemoPlaying && activeDemoStep && (
+          <div className="mb-6 bg-[#111827] text-white rounded-2xl p-4 sm:p-5 shadow-lg border border-white/10">
+            <div className="flex flex-wrap items-center justify-between gap-3 mb-2">
+              <div className="flex items-center gap-2.5">
+                <span className="px-2.5 py-0.5 rounded-full bg-[#007AFF] text-[11px] font-bold font-mono-tabular">
+                  STEP {activeDemoStep.stepNumber} OF {DEMO_STEPS.length}
+                </span>
+                <h2 className="text-sm sm:text-base font-bold text-white">
+                  {activeDemoStep.title}
+                </h2>
               </div>
+
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => handleStepJump(demoStepIndex - 1)}
+                  disabled={demoStepIndex === 0}
+                  className="p-1.5 rounded-lg bg-white/10 hover:bg-white/20 disabled:opacity-40 cursor-pointer"
+                  title="Previous Step"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleStepJump(demoStepIndex + 1)}
+                  disabled={demoStepIndex === DEMO_STEPS.length - 1}
+                  className="p-1.5 rounded-lg bg-white/10 hover:bg-white/20 disabled:opacity-40 cursor-pointer"
+                  title="Next Step"
+                >
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const nextVoice = !voiceEnabled;
+                    setVoiceEnabled(nextVoice);
+                    speakCaption(activeDemoStep.caption, nextVoice);
+                  }}
+                  className="px-2.5 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-[11px] font-semibold inline-flex items-center gap-1 cursor-pointer"
+                >
+                  {voiceEnabled ? (
+                    <>
+                      <Volume2 className="w-3.5 h-3.5 text-[#10B981]" />
+                      <span>Voice ON</span>
+                    </>
+                  ) : (
+                    <>
+                      <VolumeX className="w-3.5 h-3.5 text-white/60" />
+                      <span>Muted</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+            <p className="text-xs sm:text-sm text-white/85 leading-relaxed">
+              {activeDemoStep.caption}
+            </p>
+          </div>
+        )}
+
+        {/* RFID Gate-In / Gate-Out & SLA Notification Banners */}
+        {showRfidBanners && (
+          <div className="mb-6 grid grid-cols-1 md:grid-cols-3 gap-3.5">
+            <div className="bg-white border border-gray-200 rounded-2xl p-4 shadow-2xs flex justify-between items-start">
+              <div>
+                <p className="text-xs font-bold text-[#DC2626]">
+                  SLA Alert: VIP Vehicle Inside &gt; 3 Days
+                </p>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  Nexon • KL08BS899 • Dealer: Focuz Cars - Kochi
+                </p>
+              </div>
+              <span className="text-[11px] text-gray-400 font-mono-tabular">
+                Just now
+              </span>
+            </div>
+            <div className="bg-white border border-gray-200 rounded-2xl p-4 shadow-2xs flex justify-between items-start">
+              <div>
+                <p className="text-xs font-bold text-gray-900">
+                  RFID Gate-In successful
+                </p>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  Nexon • MH02CA1290 • Customer: Rohit Sharma
+                </p>
+              </div>
+              <span className="text-[11px] text-gray-400 font-mono-tabular">
+                Just now
+              </span>
+            </div>
+            <div className="bg-white border border-gray-200 rounded-2xl p-4 shadow-2xs flex justify-between items-start">
+              <div>
+                <p className="text-xs font-bold text-gray-900">
+                  RFID Gate-Out successful
+                </p>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  Nexon • MH02CA1280 • Customer: Prachi Sharma
+                </p>
+              </div>
+              <span className="text-[11px] text-gray-400 font-mono-tabular">
+                2m ago
+              </span>
+            </div>
+          </div>
+        )}
+
+        {/* Escalation Confirmation Banner */}
+        {recentEscalationBanner && (
+          <div className="mb-6 px-4 py-3 rounded-2xl bg-[#ECFDF5] border border-[#10B981] flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2 text-xs font-semibold text-[#065F46]">
+              <CheckCircle2 className="w-4 h-4 text-[#059669] shrink-0" />
+              <span>{recentEscalationBanner}</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setRecentEscalationBanner(null)}
+              className="text-[#065F46] hover:text-black p-1 cursor-pointer"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        )}
+
+        {/* ================= PAN-INDIA TML HIERARCHY BAR + SEGMENT & DATE CONTROLS ================= */}
+        <section className="bg-white rounded-2xl border border-[#E5E7EB] p-5 mb-6 shadow-2xs">
+          <div className="flex flex-wrap items-center justify-between gap-4 pb-4 mb-4 border-b border-[#F3F4F6]">
+            <div>
+              <div className="flex items-center gap-1.5 text-xs font-bold text-[#6B7280] mb-0.5">
+                <MapPin className="w-3.5 h-3.5 text-[#007AFF]" />
+                <span>
+                  Tata Motors Passenger &amp; Electric Vehicles · Pan-India
+                  Governance
+                </span>
+              </div>
+              <h1 className="text-lg sm:text-xl font-bold text-[#111827]">
+                TML Security, Reception &amp; Vehicle Movement Portal
+              </h1>
+            </div>
+
+            {/* Overall | PV | EV & Today | Calendar Controls */}
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="inline-flex items-center bg-[#EBECEF] rounded-full p-1">
+                {(['Overall', 'PV', 'EV'] as SegmentType[]).map((seg) => (
+                  <button
+                    key={seg}
+                    type="button"
+                    onClick={() => setCurrentSegment(seg)}
+                    className={`px-4 py-1.5 rounded-full text-xs font-semibold cursor-pointer transition-colors whitespace-nowrap shrink-0 ${
+                      currentSegment === seg
+                        ? 'bg-black text-white'
+                        : 'text-[#374151] hover:text-black'
+                    }`}
+                  >
+                    {seg}
+                  </button>
+                ))}
+              </div>
+
+              <div className="inline-flex items-center bg-[#EBECEF] rounded-full p-1">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setDateMode('Today');
+                    setSelectedDate('25 May 26');
+                    setShowCalendarPicker(false);
+                  }}
+                  className={`px-4 py-1.5 rounded-full text-xs font-semibold cursor-pointer transition-colors whitespace-nowrap shrink-0 ${
+                    dateMode === 'Today'
+                      ? 'bg-black text-white'
+                      : 'text-[#374151] hover:text-black'
+                  }`}
+                >
+                  Today
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setDateMode('Calendar');
+                    setShowCalendarPicker((prev) => !prev);
+                  }}
+                  className={`px-3.5 py-1.5 rounded-full text-xs font-semibold inline-flex items-center gap-1.5 cursor-pointer transition-colors whitespace-nowrap shrink-0 ${
+                    dateMode === 'Calendar'
+                      ? 'bg-black text-white'
+                      : 'text-[#374151] hover:text-black'
+                  }`}
+                >
+                  <Calendar className="w-3.5 h-3.5" />
+                  <span>
+                    {selectedDate !== '25 May 26' ? selectedDate : 'Calender'}
+                  </span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Interactive Zone Pills */}
+          <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+            <div className="flex flex-wrap gap-1.5">
+              {(TML_ZONES ?? []).map((z) => (
+                <button
+                  key={z.id}
+                  type="button"
+                  onClick={() => handleZoneChange(z.id)}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-semibold cursor-pointer transition-colors whitespace-nowrap shrink-0 ${
+                    selectedZone === z.id
+                      ? 'bg-black text-white'
+                      : 'bg-[#F3F4F6] text-[#374151] hover:bg-[#E5E7EB]'
+                  }`}
+                >
+                  {z.id === 'ALL' ? 'Pan-India (All 5 Zones)' : `${z.id} Zone`}
+                </button>
+              ))}
+            </div>
+
+            {(selectedZone !== 'ALL' ||
+              selectedRegion !== 'ALL' ||
+              selectedDealer !== 'ALL') && (
               <button
                 type="button"
-                onClick={() => setRecentEscalationBanner(null)}
-                className="text-[#065F46] hover:text-black p-1 cursor-pointer"
-                aria-label="Close escalation notice"
+                onClick={() => handleZoneChange('ALL')}
+                className="text-xs font-semibold text-[#007AFF] hover:underline cursor-pointer"
               >
-                <X className="w-3.5 h-3.5" />
+                Reset to Pan-India (All 5 Zones)
               </button>
-            </div>
-          )}
+            )}
+          </div>
 
-          {/* Calendar Date Selector Drawer */}
+          {/* Cascading Dropdowns for Zone, Region, and Dealership */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5">
+            <div>
+              <label className="block text-[10px] font-bold text-[#6B7280] uppercase mb-1">
+                Zone
+              </label>
+              <select
+                aria-label="Select Zone"
+                value={selectedZone}
+                onChange={(e) => handleZoneChange(e.target.value as ZoneId)}
+                className="w-full bg-[#F9FAFB] border border-[#D1D5DB] rounded-xl px-3.5 py-2.5 text-xs font-semibold text-[#111827] outline-none cursor-pointer"
+              >
+                {(TML_ZONES ?? []).map((z) => (
+                  <option key={z.id} value={z.id}>
+                    {z.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-[10px] font-bold text-[#6B7280] uppercase mb-1">
+                Region ({(availableRegions ?? []).length} Regional Offices)
+              </label>
+              <select
+                aria-label="Select Region"
+                value={selectedRegion}
+                onChange={(e) => handleRegionChange(e.target.value)}
+                className="w-full bg-[#F9FAFB] border border-[#D1D5DB] rounded-xl px-3.5 py-2.5 text-xs font-semibold text-[#111827] outline-none cursor-pointer"
+              >
+                <option value="ALL">
+                  All Regions ({(availableRegions ?? []).length})
+                </option>
+                {(availableRegions ?? []).map((reg) => (
+                  <option key={reg.id} value={reg.id}>
+                    {reg.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-[10px] font-bold text-[#6B7280] uppercase mb-1">
+                Dealership ({(availableDealers ?? []).length} in Scope)
+              </label>
+              <select
+                aria-label="Select Dealership"
+                value={selectedDealer}
+                onChange={(e) => handleHomeDealerChange(e.target.value)}
+                className="w-full bg-[#F9FAFB] border border-[#D1D5DB] rounded-xl px-3.5 py-2.5 text-xs font-semibold text-[#111827] outline-none cursor-pointer"
+              >
+                <option value="ALL">
+                  All Dealerships ({(availableDealers ?? []).length})
+                </option>
+                {(availableDealers ?? []).map((dealerName) => (
+                  <option key={dealerName} value={dealerName}>
+                    {dealerName}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          {/* Calendar Picker Drawer */}
           {showCalendarPicker && (
-            <div className="mx-4 mt-3 p-3 rounded-2xl bg-[#F9FAFB] border border-[#E5E7EB]">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-[11px] font-bold text-[#374151]">
-                  Select Workshop Governance Date
+            <div className="mt-4 pt-4 border-t border-[#E5E7EB]">
+              <div className="flex items-center justify-between mb-2.5">
+                <span className="text-xs font-bold text-[#374151]">
+                  Select Governance Date
                 </span>
                 <button
                   type="button"
                   onClick={() => setShowCalendarPicker(false)}
-                  className="text-[11px] font-semibold text-[#6B7280] hover:text-black cursor-pointer"
+                  className="text-xs font-semibold text-[#6B7280] hover:text-black cursor-pointer"
                 >
                   Done
                 </button>
               </div>
-              <div className="grid grid-cols-3 gap-1.5">
+              <div className="grid grid-cols-3 gap-2 max-w-md">
                 {(AVAILABLE_DATES ?? []).map((d) => (
                   <button
                     key={d}
@@ -846,10 +1094,10 @@ export default function App() {
                       setDateMode(d === '25 May 26' ? 'Today' : 'Calendar');
                       setShowCalendarPicker(false);
                     }}
-                    className={`py-2 px-2.5 rounded-xl text-[12px] font-semibold font-mono-tabular cursor-pointer transition-colors ${
+                    className={`py-2 px-3 rounded-xl text-xs font-semibold font-mono-tabular cursor-pointer transition-colors ${
                       selectedDate === d
                         ? 'bg-black text-white'
-                        : 'bg-white border border-[#E5E7EB] text-[#374151] hover:bg-[#F3F4F6]'
+                        : 'bg-[#F9FAFB] border border-[#E5E7EB] text-[#374151] hover:bg-[#F3F4F6]'
                     }`}
                   >
                     {d}
@@ -858,158 +1106,47 @@ export default function App() {
               </div>
             </div>
           )}
+        </section>
 
-          {/* ================= VIEW 1: TML HOME DASHBOARD ================= */}
-          {activeView === 'home' && (
-            <div className="p-4 flex-1 overflow-y-auto">
-              {/* Pan-India TML Hierarchy Bar: All Zones, All Regions & Dealerships */}
-              <div className="flex flex-col gap-2 mb-3.5 bg-[#F9FAFB] p-2.5 rounded-2xl border border-[#E5E7EB]">
-                <div className="flex items-center justify-between px-1">
-                  <span className="text-[10px] font-bold text-[#6B7280] tracking-tight flex items-center gap-1">
-                    <MapPin className="w-3 h-3 text-[#111827]" />
-                    <span>TML Pan-India Hierarchy (Zone · Region · Dealer)</span>
-                  </span>
-                  {(selectedZone !== 'ALL' ||
-                    selectedRegion !== 'ALL' ||
-                    selectedDealer !== 'ALL') && (
-                    <button
-                      type="button"
-                      onClick={() => handleZoneChange('ALL')}
-                      className="text-[10px] font-semibold text-[#007AFF] hover:underline cursor-pointer"
-                    >
-                      View Pan-India
-                    </button>
-                  )}
+        {/* ================= VIEW 1: WEB DASHBOARD OVERVIEW ================= */}
+        {activeView === 'home' ? (
+          <div className="space-y-6">
+            {/* Today's Summary (6 Core Cards in a Full-Width Web Grid) */}
+            <section className="bg-white rounded-2xl border border-[#E5E7EB] p-5 sm:p-6 shadow-2xs">
+              <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
+                <div>
+                  <h2 className="text-base font-bold text-[#111827]">
+                    Today&apos;s Summary (Network Aggregate)
+                  </h2>
+                  <p className="text-xs text-[#6B7280]">
+                    Click any metric tile to open the corresponding vehicle
+                    list
+                  </p>
                 </div>
-
-                <div className="grid grid-cols-2 gap-2">
-                  <select
-                    aria-label="Select TML Zone"
-                    value={selectedZone}
-                    onChange={(e) => handleZoneChange(e.target.value as ZoneId)}
-                    className="w-full py-2 px-2.5 rounded-[10px] border border-[#D1D5DB] bg-white text-[11px] font-semibold text-[#111827] outline-none cursor-pointer truncate"
-                  >
-                    {(TML_ZONES ?? []).map((z) => (
-                      <option key={z.id} value={z.id}>
-                        {z.label}
-                      </option>
-                    ))}
-                  </select>
-
-                  <select
-                    aria-label="Select TML Region"
-                    value={selectedRegion}
-                    onChange={(e) => handleRegionChange(e.target.value)}
-                    className="w-full py-2 px-2.5 rounded-[10px] border border-[#D1D5DB] bg-white text-[11px] font-semibold text-[#111827] outline-none cursor-pointer truncate"
-                  >
-                    <option value="ALL">
-                      All Regions ({(availableRegions ?? []).length})
-                    </option>
-                    {(availableRegions ?? []).map((reg) => (
-                      <option key={reg.id} value={reg.id}>
-                        {reg.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <select
-                  aria-label="Select Dealership"
-                  value={selectedDealer}
-                  onChange={(e) => handleHomeDealerChange(e.target.value)}
-                  className="w-full py-2 px-2.5 rounded-[10px] border border-[#D1D5DB] bg-white text-[11px] font-semibold text-[#111827] outline-none cursor-pointer"
+                <button
+                  type="button"
+                  onClick={() => openListView('Vehicle Movement Register')}
+                  className="px-4 py-2 rounded-xl bg-[#111827] hover:bg-[#1F2937] text-white text-xs font-semibold inline-flex items-center gap-2 cursor-pointer transition-colors"
                 >
-                  <option value="ALL">
-                    All Dealerships in Scope ({(availableDealers ?? []).length})
-                  </option>
-                  {(availableDealers ?? []).map((dealerName) => (
-                    <option key={dealerName} value={dealerName}>
-                      {dealerName}
-                    </option>
-                  ))}
-                </select>
+                  <ClipboardList className="w-4 h-4" />
+                  <span>
+                    Open Vehicle Movement Register (
+                    {computedKpis.movementRegisterCount})
+                  </span>
+                </button>
               </div>
 
-              {/* Overall / PV / EV & Today / Calendar Toggles */}
-              <div className="flex justify-between items-center mb-4 gap-2.5">
-                <div className="bg-[#EBECEF] rounded-full p-[3px] inline-flex items-center">
-                  {(['Overall', 'PV', 'EV'] as SegmentType[]).map((seg) => (
-                    <button
-                      key={seg}
-                      type="button"
-                      onClick={() => setCurrentSegment(seg)}
-                      className={`border-none py-[7px] px-3.5 rounded-full text-[12px] font-semibold cursor-pointer transition-colors whitespace-nowrap shrink-0 ${
-                        currentSegment === seg
-                          ? 'bg-black text-white'
-                          : 'bg-transparent text-[#374151] hover:text-black'
-                      }`}
-                    >
-                      {seg}
-                    </button>
-                  ))}
-                </div>
-
-                <div className="bg-[#EBECEF] rounded-full p-[3px] inline-flex items-center">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setDateMode('Today');
-                      setSelectedDate('25 May 26');
-                      setShowCalendarPicker(false);
-                    }}
-                    className={`border-none py-[7px] px-3 rounded-full text-[12px] font-semibold cursor-pointer transition-colors whitespace-nowrap shrink-0 ${
-                      dateMode === 'Today'
-                        ? 'bg-black text-white'
-                        : 'bg-transparent text-[#374151]'
-                    }`}
-                  >
-                    Today
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setDateMode('Calendar');
-                      setShowCalendarPicker((prev) => !prev);
-                    }}
-                    className={`border-none py-[7px] px-3 rounded-full text-[12px] font-semibold cursor-pointer transition-colors inline-flex items-center gap-1 whitespace-nowrap shrink-0 ${
-                      dateMode === 'Calendar'
-                        ? 'bg-black text-white'
-                        : 'bg-transparent text-[#374151]'
-                    }`}
-                  >
-                    <Calendar className="w-3.5 h-3.5" />
-                    <span>
-                      {selectedDate !== '25 May 26' ? selectedDate : 'Calender'}
-                    </span>
-                  </button>
-                </div>
-              </div>
-
-              {/* Today's Summary (Network Aggregate) */}
-              <div className="text-[14px] font-semibold text-[#1F2937] mb-3 flex justify-between items-center">
-                <span>Today&apos;s Summary (Network Aggregate)</span>
-                {selectedDealer !== 'ALL' && (
-                  <button
-                    type="button"
-                    onClick={() => handleHomeDealerChange('ALL')}
-                    className="text-[11px] font-semibold text-[#007AFF] hover:underline cursor-pointer"
-                  >
-                    Reset Dealer
-                  </button>
-                )}
-              </div>
-
-              {/* 4 Pastel Summary Cards */}
-              <div className="grid grid-cols-4 gap-2 mb-3.5">
+              {/* 6-Column Web KPI Grid: 4 Pastel Tiles + 2 Active Counter Cards */}
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3.5">
                 <button
                   type="button"
                   onClick={() => openListView('Gate In')}
-                  className="rounded-[14px] py-3.5 px-1.5 text-center cursor-pointer active:scale-[0.97] transition-transform bg-[#CBEFD8] border-none"
+                  className="bg-[#CBEFD8] rounded-2xl p-4 text-center cursor-pointer hover:opacity-95 active:scale-[0.98] transition-all flex flex-col justify-center"
                 >
-                  <div className="text-[20px] font-bold text-[#111827] mb-1.5 font-mono-tabular">
+                  <div className="text-2xl sm:text-3xl font-bold text-[#111827] mb-1 font-mono-tabular">
                     {computedKpis.gateIn}
                   </div>
-                  <div className="text-[11px] font-medium text-[#1F2937] leading-[1.2]">
+                  <div className="text-xs font-semibold text-[#1F2937]">
                     Gate In
                   </div>
                 </button>
@@ -1017,12 +1154,12 @@ export default function App() {
                 <button
                   type="button"
                   onClick={() => openListView('Gate Out')}
-                  className="rounded-[14px] py-3.5 px-1.5 text-center cursor-pointer active:scale-[0.97] transition-transform bg-[#E1F6EA] border-none"
+                  className="bg-[#E1F6EA] rounded-2xl p-4 text-center cursor-pointer hover:opacity-95 active:scale-[0.98] transition-all flex flex-col justify-center"
                 >
-                  <div className="text-[20px] font-bold text-[#111827] mb-1.5 font-mono-tabular">
+                  <div className="text-2xl sm:text-3xl font-bold text-[#111827] mb-1 font-mono-tabular">
                     {computedKpis.gateOut}
                   </div>
-                  <div className="text-[11px] font-medium text-[#1F2937] leading-[1.2]">
+                  <div className="text-xs font-semibold text-[#1F2937]">
                     Gate Out
                   </div>
                 </button>
@@ -1030,12 +1167,12 @@ export default function App() {
                 <button
                   type="button"
                   onClick={() => openListView('Road Test Out')}
-                  className="rounded-[14px] py-3.5 px-1.5 text-center cursor-pointer active:scale-[0.97] transition-transform bg-[#FEF5DF] border-none"
+                  className="bg-[#FEF5DF] rounded-2xl p-4 text-center cursor-pointer hover:opacity-95 active:scale-[0.98] transition-all flex flex-col justify-center"
                 >
-                  <div className="text-[20px] font-bold text-[#111827] mb-1.5 font-mono-tabular">
+                  <div className="text-2xl sm:text-3xl font-bold text-[#111827] mb-1 font-mono-tabular">
                     {computedKpis.rtOut}
                   </div>
-                  <div className="text-[11px] font-medium text-[#1F2937] leading-[1.2]">
+                  <div className="text-xs font-semibold text-[#1F2937]">
                     Road Test Out
                   </div>
                 </button>
@@ -1043,33 +1180,30 @@ export default function App() {
                 <button
                   type="button"
                   onClick={() => openListView('Road Test In')}
-                  className="rounded-[14px] py-3.5 px-1.5 text-center cursor-pointer active:scale-[0.97] transition-transform bg-[#FCEFB8] border-none"
+                  className="bg-[#FCEFB8] rounded-2xl p-4 text-center cursor-pointer hover:opacity-95 active:scale-[0.98] transition-all flex flex-col justify-center"
                 >
-                  <div className="text-[20px] font-bold text-[#111827] mb-1.5 font-mono-tabular">
+                  <div className="text-2xl sm:text-3xl font-bold text-[#111827] mb-1 font-mono-tabular">
                     {computedKpis.rtIn}
                   </div>
-                  <div className="text-[11px] font-medium text-[#1F2937] leading-[1.2]">
+                  <div className="text-xs font-semibold text-[#1F2937]">
                     Road Test In
                   </div>
                 </button>
-              </div>
 
-              {/* 2 Workshop Counter Cards */}
-              <div className="grid grid-cols-2 gap-3 mb-3.5">
                 <button
                   type="button"
                   onClick={() => openListView('Vehicles Inside Workshop')}
-                  className="border border-[#E5E7EB] rounded-[16px] p-3.5 bg-white cursor-pointer shadow-[0_2px_6px_rgba(0,0,0,0.02)] text-left hover:border-[#9CA3AF] transition-colors"
+                  className="border border-[#E5E7EB] rounded-2xl p-4 text-left bg-white hover:border-[#9CA3AF] cursor-pointer transition-colors flex flex-col justify-between"
                 >
-                  <div className="flex justify-between items-center mb-2.5">
+                  <div className="flex items-center justify-between mb-2">
                     <div className="w-8 h-8 rounded-lg bg-[#F3F4F6] flex items-center justify-center text-[#4B5563]">
                       <Home className="w-4 h-4" />
                     </div>
-                    <div className="text-[22px] font-bold text-black font-mono-tabular">
+                    <span className="text-2xl font-bold text-[#111827] font-mono-tabular">
                       {computedKpis.inside}
-                    </div>
+                    </span>
                   </div>
-                  <div className="text-[12px] font-medium text-[#374151]">
+                  <div className="text-xs font-semibold text-[#374151]">
                     Vehicle Inside Workshop
                   </div>
                 </button>
@@ -1077,74 +1211,54 @@ export default function App() {
                 <button
                   type="button"
                   onClick={() => openListView('Active Road Tests')}
-                  className="border border-[#E5E7EB] rounded-[16px] p-3.5 bg-white cursor-pointer shadow-[0_2px_6px_rgba(0,0,0,0.02)] text-left hover:border-[#9CA3AF] transition-colors"
+                  className="border border-[#E5E7EB] rounded-2xl p-4 text-left bg-white hover:border-[#9CA3AF] cursor-pointer transition-colors flex flex-col justify-between"
                 >
-                  <div className="flex justify-between items-center mb-2.5">
+                  <div className="flex items-center justify-between mb-2">
                     <div className="w-8 h-8 rounded-lg bg-[#F3F4F6] flex items-center justify-center text-[#4B5563]">
                       <Car className="w-4 h-4" />
                     </div>
-                    <div className="text-[22px] font-bold text-black font-mono-tabular">
+                    <span className="text-2xl font-bold text-[#111827] font-mono-tabular">
                       {computedKpis.activeRt}
-                    </div>
+                    </span>
                   </div>
-                  <div className="text-[12px] font-medium text-[#374151]">
+                  <div className="text-xs font-semibold text-[#374151]">
                     Active Road Test Count
                   </div>
                 </button>
               </div>
+            </section>
 
-              {/* Dedicated Card for Vehicle Movement Register */}
-              <button
-                type="button"
-                onClick={() => openListView('Vehicle Movement Register')}
-                className="w-full mb-5 p-3.5 rounded-[16px] border border-[#111827] bg-[#111827] text-white flex items-center justify-between cursor-pointer shadow-[0_4px_12px_rgba(0,0,0,0.08)] active:scale-[0.99] transition-transform"
-              >
-                <div className="flex items-center gap-3 text-left">
-                  <div className="w-9 h-9 rounded-xl bg-white/15 flex items-center justify-center shrink-0">
-                    <ClipboardList className="w-5 h-5 text-white" />
-                  </div>
-                  <div>
-                    <div className="text-[14px] font-bold leading-snug">
-                      Vehicle Movement Register
-                    </div>
-                    <div className="text-[11px] text-white/75">
-                      Gate In/Out Logs · Security Guard &amp; Road Test Count
-                    </div>
-                  </div>
+            {/* TML Governance & Exceptions Row */}
+            <section className="bg-white rounded-2xl border border-[#E5E7EB] p-5 sm:p-6 shadow-2xs">
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <h2 className="text-base font-bold text-[#111827]">
+                    TML Governance &amp; SLA Exceptions
+                  </h2>
+                  <p className="text-xs text-[#6B7280]">
+                    Proactive monitoring for workshop dwell breaches, VIP/Repeat
+                    visits, RFID gate automation, and extended road tests
+                  </p>
                 </div>
-                <div className="flex items-center gap-2 shrink-0">
-                  <span className="px-2.5 py-1 rounded-lg bg-white/15 text-[12px] font-bold font-mono-tabular">
-                    {computedKpis.movementRegisterCount}
-                  </span>
-                  <ChevronRight className="w-4 h-4 text-white/80" />
-                </div>
-              </button>
-
-              {/* TML Governance & Exceptions */}
-              <div className="text-[14px] font-semibold text-[#1F2937] mb-3 flex justify-between items-center">
-                <span>TML Governance &amp; Exceptions</span>
-                <span className="text-[11px] font-medium text-[#6B7280]">
-                  Tap card to audit
-                </span>
               </div>
 
-              <div className="grid grid-cols-2 gap-3 mb-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 <button
                   type="button"
                   onClick={() =>
                     openListView('Vehicles Inside Workshop', 'AGEING')
                   }
-                  className="border border-[#E5E7EB] rounded-[16px] p-3.5 bg-white cursor-pointer shadow-[0_4px_10px_rgba(0,0,0,0.03)] flex flex-col justify-between min-h-[100px] text-left hover:border-[#DC2626]/50 transition-colors"
+                  className="border border-[#E5E7EB] rounded-2xl p-4 bg-white hover:border-[#DC2626]/50 text-left cursor-pointer transition-colors"
                 >
-                  <div className="flex justify-between items-center mb-2.5 w-full">
-                    <div className="w-8 h-8 rounded-lg bg-[#FEF2F2] flex items-center justify-center text-[#DC2626]">
-                      <Clock className="w-4 h-4" />
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="w-9 h-9 rounded-xl bg-[#FEF2F2] flex items-center justify-center text-[#DC2626]">
+                      <Clock className="w-5 h-5" />
                     </div>
-                    <span className="py-1.5 px-2.5 rounded-[10px] text-[13px] font-bold bg-[#FEE2E2] text-[#DC2626] font-mono-tabular">
+                    <span className="py-1 px-3 rounded-lg text-sm font-bold bg-[#FEE2E2] text-[#DC2626] font-mono-tabular">
                       {computedKpis.ageingCount}
                     </span>
                   </div>
-                  <div className="flex justify-between items-center text-[12px] font-semibold text-[#111827] w-full">
+                  <div className="flex items-center justify-between text-xs font-bold text-[#111827]">
                     <span>Ageing &gt; 48 Hrs</span>
                     <ChevronRight className="w-4 h-4 text-[#6B7280]" />
                   </div>
@@ -1155,17 +1269,17 @@ export default function App() {
                   onClick={() =>
                     openListView('Vehicles Inside Workshop', 'VIP_RV')
                   }
-                  className="border border-[#E5E7EB] rounded-[16px] p-3.5 bg-white cursor-pointer shadow-[0_4px_10px_rgba(0,0,0,0.03)] flex flex-col justify-between min-h-[100px] text-left hover:border-[#9333EA]/50 transition-colors"
+                  className="border border-[#E5E7EB] rounded-2xl p-4 bg-white hover:border-[#9333EA]/50 text-left cursor-pointer transition-colors"
                 >
-                  <div className="flex justify-between items-center mb-2.5 w-full">
-                    <div className="w-8 h-8 rounded-lg bg-[#FAF5FF] flex items-center justify-center text-[#9333EA]">
-                      <Star className="w-4 h-4" />
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="w-9 h-9 rounded-xl bg-[#FAF5FF] flex items-center justify-center text-[#9333EA]">
+                      <Star className="w-5 h-5" />
                     </div>
-                    <span className="py-1.5 px-2.5 rounded-[10px] text-[13px] font-bold bg-[#F3E8FF] text-[#9333EA] font-mono-tabular">
+                    <span className="py-1 px-3 rounded-lg text-sm font-bold bg-[#F3E8FF] text-[#9333EA] font-mono-tabular">
                       {computedKpis.vipRvCount}
                     </span>
                   </div>
-                  <div className="flex justify-between items-center text-[12px] font-semibold text-[#111827] w-full">
+                  <div className="flex items-center justify-between text-xs font-bold text-[#111827]">
                     <span>VIP &amp; Repeat (RV)</span>
                     <ChevronRight className="w-4 h-4 text-[#6B7280]" />
                   </div>
@@ -1173,19 +1287,19 @@ export default function App() {
 
                 <button
                   type="button"
-                  onClick={() => setShowRfidSheet((prev) => !prev)}
-                  className="border border-[#E5E7EB] rounded-[16px] p-3.5 bg-white cursor-pointer shadow-[0_4px_10px_rgba(0,0,0,0.03)] flex flex-col justify-between min-h-[100px] text-left hover:border-[#2563EB]/50 transition-colors"
+                  onClick={() => openListView('Vehicle Movement Register')}
+                  className="border border-[#E5E7EB] rounded-2xl p-4 bg-white hover:border-[#2563EB]/50 text-left cursor-pointer transition-colors"
                 >
-                  <div className="flex justify-between items-center mb-2.5 w-full">
-                    <div className="w-8 h-8 rounded-lg bg-[#EFF6FF] flex items-center justify-center text-[#2563EB]">
-                      <Radio className="w-4 h-4" />
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="w-9 h-9 rounded-xl bg-[#EFF6FF] flex items-center justify-center text-[#2563EB]">
+                      <Radio className="w-5 h-5" />
                     </div>
-                    <span className="py-1.5 px-2.5 rounded-[10px] text-[13px] font-bold bg-[#DBEAFE] text-[#2563EB] font-mono-tabular">
+                    <span className="py-1 px-3 rounded-lg text-sm font-bold bg-[#DBEAFE] text-[#2563EB] font-mono-tabular">
                       {computedKpis.rfidCompliance}
                     </span>
                   </div>
-                  <div className="flex justify-between items-center text-[12px] font-semibold text-[#111827] w-full">
-                    <span>RFID Compliance</span>
+                  <div className="flex items-center justify-between text-xs font-bold text-[#111827]">
+                    <span>RFID Gate Compliance</span>
                     <ChevronRight className="w-4 h-4 text-[#6B7280]" />
                   </div>
                 </button>
@@ -1193,362 +1307,356 @@ export default function App() {
                 <button
                   type="button"
                   onClick={() => openListView('Active Road Tests')}
-                  className="border border-[#E5E7EB] rounded-[16px] p-3.5 bg-white cursor-pointer shadow-[0_4px_10px_rgba(0,0,0,0.03)] flex flex-col justify-between min-h-[100px] text-left hover:border-[#D97706]/50 transition-colors"
+                  className="border border-[#E5E7EB] rounded-2xl p-4 bg-white hover:border-[#D97706]/50 text-left cursor-pointer transition-colors"
                 >
-                  <div className="flex justify-between items-center mb-2.5 w-full">
-                    <div className="w-8 h-8 rounded-lg bg-[#FFFBEB] flex items-center justify-center text-[#D97706]">
-                      <AlertTriangle className="w-4 h-4" />
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="w-9 h-9 rounded-xl bg-[#FFFBEB] flex items-center justify-center text-[#D97706]">
+                      <AlertTriangle className="w-5 h-5" />
                     </div>
-                    <span className="py-1.5 px-2.5 rounded-[10px] text-[13px] font-bold bg-[#FEF3C7] text-[#D97706] font-mono-tabular">
+                    <span className="py-1 px-3 rounded-lg text-sm font-bold bg-[#FEF3C7] text-[#D97706] font-mono-tabular">
                       {computedKpis.activeRtOver20m}
                     </span>
                   </div>
-                  <div className="flex justify-between items-center text-[12px] font-semibold text-[#111827] w-full">
+                  <div className="flex items-center justify-between text-xs font-bold text-[#111827]">
                     <span>Active RT &gt; 20m</span>
                     <ChevronRight className="w-4 h-4 text-[#6B7280]" />
                   </div>
                 </button>
               </div>
+            </section>
 
-              {/* Collapsible RFID Gate-In Compliance Breakdown inside Mobile Frame */}
-              {showRfidSheet && (
-                <div className="mt-2 p-3.5 rounded-2xl bg-[#F9FAFB] border border-[#E5E7EB]">
-                  <div className="flex items-center justify-between mb-2.5">
-                    <div>
-                      <div className="text-[13px] font-bold text-[#111827]">
-                        RFID Auto-Gate Telemetry
-                      </div>
-                      <div className="text-[11px] text-[#6B7280]">
-                        Auto RFID Tag Read vs Manual Security Scan
-                      </div>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => setShowRfidSheet(false)}
-                      className="p-1 text-[#6B7280] hover:text-black cursor-pointer"
-                    >
-                      <X className="w-4 h-4" />
-                    </button>
-                  </div>
-                  <div className="space-y-2">
-                    {(scopedComplianceList ?? []).map((item) => (
-                      <div
-                        key={item.dealer}
-                        onClick={() => {
-                          setSelectedDealer(item.dealer);
-                          openListView('Vehicle Movement Register');
-                        }}
-                        className="bg-white p-2.5 rounded-xl border border-[#E5E7EB] flex items-center justify-between cursor-pointer hover:border-[#2563EB]/40"
-                      >
-                        <div>
-                          <div className="text-[12px] font-semibold text-[#111827]">
-                            {item.dealer}
-                          </div>
-                          <div className="text-[11px] text-[#6B7280] font-mono-tabular">
-                            {item.region} · {item.rfidAutoCount} Auto /{' '}
-                            {item.manualScanCount} Manual
-                          </div>
+            {/* Dealership Summary Grid (3 Columns on Desktop Web) */}
+            <section className="bg-white rounded-2xl border border-[#E5E7EB] p-5 sm:p-6 shadow-2xs">
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <h2 className="text-base font-bold text-[#111827]">
+                    Dealership Summary ({(dealerSummaryCards ?? []).length}{' '}
+                    Dealerships in Scope)
+                  </h2>
+                  <p className="text-xs text-[#6B7280]">
+                    Click any dealership card to inspect its workshop vehicles
+                    and movement register
+                  </p>
+                </div>
+                {selectedDealer !== 'ALL' && (
+                  <button
+                    type="button"
+                    onClick={() => handleHomeDealerChange('ALL')}
+                    className="text-xs font-semibold text-[#007AFF] hover:underline cursor-pointer"
+                  >
+                    Show All Dealerships
+                  </button>
+                )}
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {(dealerSummaryCards ?? []).map((dealer) => (
+                  <div
+                    key={dealer.name}
+                    onClick={() => {
+                      handleHomeDealerChange(dealer.name);
+                      openListView('Vehicles Inside Workshop');
+                    }}
+                    className="border border-[#E5E7EB] rounded-2xl p-4 bg-white hover:border-[#9CA3AF] cursor-pointer transition-colors"
+                  >
+                    <div className="flex items-center justify-between mb-3">
+                      <div>
+                        <div className="text-sm font-bold text-[#111827]">
+                          {dealer.name}
                         </div>
-                        <div className="text-right">
-                          <span
-                            className={`text-[13px] font-bold font-mono-tabular ${
-                              item.compliancePct >= 90
-                                ? 'text-[#059669]'
-                                : 'text-[#D97706]'
-                            }`}
-                          >
-                            {item.compliancePct}%
+                        <div className="text-[11px] text-[#6B7280]">
+                          {dealer.zone} Zone · {dealer.region} · RFID:{' '}
+                          <span className="font-semibold text-[#059669]">
+                            {dealer.compliancePct}%
                           </span>
                         </div>
                       </div>
-                    ))}
+                      <ChevronRight className="w-4 h-4 text-[#6B7280]" />
+                    </div>
+
+                    <div className="grid grid-cols-4 gap-2 text-center">
+                      <div className="bg-[#CBEFD8]/60 rounded-xl py-2">
+                        <div className="text-xs font-bold text-[#111827] font-mono-tabular">
+                          {dealer.gateIn}
+                        </div>
+                        <div className="text-[10px] text-[#374151]">Gate In</div>
+                      </div>
+                      <div className="bg-[#E1F6EA]/70 rounded-xl py-2">
+                        <div className="text-xs font-bold text-[#111827] font-mono-tabular">
+                          {dealer.gateOut}
+                        </div>
+                        <div className="text-[10px] text-[#374151]">
+                          Gate Out
+                        </div>
+                      </div>
+                      <div className="bg-[#FEF5DF] rounded-xl py-2">
+                        <div className="text-xs font-bold text-[#111827] font-mono-tabular">
+                          {dealer.rtOut}
+                        </div>
+                        <div className="text-[10px] text-[#374151]">RT Out</div>
+                      </div>
+                      <div className="bg-[#FCEFB8]/70 rounded-xl py-2">
+                        <div className="text-xs font-bold text-[#111827] font-mono-tabular">
+                          {dealer.rtIn}
+                        </div>
+                        <div className="text-[10px] text-[#374151]">RT In</div>
+                      </div>
+                    </div>
                   </div>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* ================= VIEW 2: VEHICLE MOVEMENT REGISTER & DRILL-DOWN LIST VIEW ================= */}
-          {activeView === 'list' && (
-            <div className="p-4 flex-1 overflow-y-auto">
-              <div className="flex justify-between items-center mb-3.5">
-                <h2 className="text-[20px] font-bold text-[#111827] tracking-tight">
-                  {currentCategory}
-                </h2>
-                <button
-                  type="button"
-                  onClick={closeListView}
-                  className="bg-transparent border-none text-[14px] font-semibold text-[#111827] hover:text-[#007AFF] cursor-pointer py-1 px-2"
-                >
-                  Back
-                </button>
-              </div>
-
-              {/* Compact Zone & Region Selector inside List View */}
-              <div className="grid grid-cols-2 gap-2 mb-3">
-                <select
-                  aria-label="Zone Filter in List View"
-                  value={selectedZone}
-                  onChange={(e) => handleZoneChange(e.target.value as ZoneId)}
-                  className="py-1.5 px-2.5 rounded-lg border border-[#D1D5DB] bg-[#F9FAFB] text-[11px] font-semibold text-[#111827] outline-none cursor-pointer truncate"
-                >
-                  {(TML_ZONES ?? []).map((z) => (
-                    <option key={z.id} value={z.id}>
-                      {z.label}
-                    </option>
-                  ))}
-                </select>
-
-                <select
-                  aria-label="Region Filter in List View"
-                  value={selectedRegion}
-                  onChange={(e) => handleRegionChange(e.target.value)}
-                  className="py-1.5 px-2.5 rounded-lg border border-[#D1D5DB] bg-[#F9FAFB] text-[11px] font-semibold text-[#111827] outline-none cursor-pointer truncate"
-                >
-                  <option value="ALL">
-                    All Regions ({(availableRegions ?? []).length})
-                  </option>
-                  {(availableRegions ?? []).map((reg) => (
-                    <option key={reg.id} value={reg.id}>
-                      {reg.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Overall / PV / EV & Today / Calendar Toggles */}
-              <div className="flex justify-between items-center mb-4 gap-2.5">
-                <div className="bg-[#EBECEF] rounded-full p-[3px] inline-flex items-center">
-                  {(['Overall', 'PV', 'EV'] as SegmentType[]).map((seg) => (
-                    <button
-                      key={seg}
-                      type="button"
-                      onClick={() => setCurrentSegment(seg)}
-                      className={`border-none py-[7px] px-3.5 rounded-full text-[12px] font-semibold cursor-pointer transition-colors whitespace-nowrap shrink-0 ${
-                        currentSegment === seg
-                          ? 'bg-black text-white'
-                          : 'bg-transparent text-[#374151] hover:text-black'
-                      }`}
-                    >
-                      {seg}
-                    </button>
-                  ))}
-                </div>
-
-                <div className="bg-[#EBECEF] rounded-full p-[3px] inline-flex items-center">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setDateMode('Today');
-                      setSelectedDate('25 May 26');
-                      setShowCalendarPicker(false);
-                    }}
-                    className={`border-none py-[7px] px-3 rounded-full text-[12px] font-semibold cursor-pointer transition-colors whitespace-nowrap shrink-0 ${
-                      dateMode === 'Today'
-                        ? 'bg-black text-white'
-                        : 'bg-transparent text-[#374151]'
-                    }`}
-                  >
-                    Today
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setDateMode('Calendar');
-                      setShowCalendarPicker((prev) => !prev);
-                    }}
-                    className={`border-none py-[7px] px-3 rounded-full text-[12px] font-semibold cursor-pointer transition-colors inline-flex items-center gap-1 whitespace-nowrap shrink-0 ${
-                      dateMode === 'Calendar'
-                        ? 'bg-black text-white'
-                        : 'bg-transparent text-[#374151]'
-                    }`}
-                  >
-                    <Calendar className="w-3.5 h-3.5" />
-                    <span>
-                      {selectedDate !== '25 May 26' ? selectedDate : 'Calender'}
-                    </span>
-                  </button>
-                </div>
-              </div>
-
-              {/* Quick View Switcher Bar */}
-              <div className="flex items-center gap-1.5 overflow-x-auto pb-2.5 mb-3 no-scrollbar">
-                {(
-                  [
-                    'Vehicle Movement Register',
-                    'Vehicles Inside Workshop',
-                    'Gate In',
-                    'Gate Out',
-                    'Road Test Out',
-                    'Road Test In',
-                    'Active Road Tests',
-                  ] as VehicleCategory[]
-                ).map((cat) => (
-                  <button
-                    key={cat}
-                    type="button"
-                    onClick={() => setCurrentCategory(cat)}
-                    className={`px-3 py-1.5 rounded-full text-[11px] font-semibold whitespace-nowrap shrink-0 cursor-pointer transition-colors ${
-                      currentCategory === cat
-                        ? 'bg-[#111827] text-white'
-                        : 'bg-[#F3F4F6] text-[#4B5563] hover:bg-[#E5E7EB]'
-                    }`}
-                  >
-                    {cat}
-                  </button>
                 ))}
               </div>
+            </section>
 
-              {/* Search & Filter Card */}
-              <div className="bg-white border border-[#E5E7EB] rounded-[20px] p-4 mb-5 shadow-[0_4px_14px_rgba(0,0,0,0.04)]">
-                <div className="bg-[#F3F4F6] rounded-full py-2.5 px-4 flex items-center gap-2.5 mb-3.5">
-                  <Search className="w-4 h-4 text-[#6B7280] shrink-0" />
-                  <input
-                    type="text"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder="Search vehicle"
-                    className="border-none bg-transparent w-full text-[13px] text-[#111827] outline-none placeholder:text-[#6B7280]"
-                  />
-                  {searchQuery && (
-                    <button
-                      type="button"
-                      onClick={() => setSearchQuery('')}
-                      className="text-[#6B7280] hover:text-black cursor-pointer"
-                      aria-label="Clear search"
-                    >
-                      <X className="w-3.5 h-3.5" />
-                    </button>
-                  )}
+            {/* CSM & Dealer GM Escalation Log */}
+            <section className="bg-white rounded-2xl border border-[#E5E7EB] p-5 sm:p-6 shadow-2xs">
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <h2 className="text-base font-bold text-[#111827]">
+                    CSM &amp; Dealer GM Escalation Log
+                  </h2>
+                  <p className="text-xs text-[#6B7280]">
+                    Real-time audit trail of SLA delay escalations triggered by
+                    TML regional teams
+                  </p>
                 </div>
+                <span className="text-xs font-mono-tabular font-semibold text-[#4B5563]">
+                  {(escalationLogs ?? []).length} Dispatched
+                </span>
+              </div>
 
-                {/* Filter Row 1: Filter by Security Guard & Filter by Visit Type */}
-                <div className="grid grid-cols-2 gap-3 mb-3">
-                  <div>
-                    <label
-                      htmlFor="listGuardFilter"
-                      className="block text-[10px] font-bold text-[#9CA3AF] tracking-[0.4px] mb-1.5"
-                    >
-                      Filter by Security Guard
-                    </label>
-                    <select
-                      id="listGuardFilter"
-                      value={listGuardFilter}
-                      onChange={(e) => setListGuardFilter(e.target.value)}
-                      className="w-full py-[9px] px-3 rounded-full border border-[#E5E7EB] bg-[#F9FAFB] text-[12px] font-medium text-[#1F2937] outline-none cursor-pointer"
-                    >
-                      <option value="ALL">All Guards</option>
-                      {(SECURITY_GUARDS ?? []).map((g) => (
-                        <option key={g} value={g}>
-                          {g}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div>
-                    <label
-                      htmlFor="listVisitFilter"
-                      className="block text-[10px] font-bold text-[#9CA3AF] tracking-[0.4px] mb-1.5"
-                    >
-                      Filter by Visit Type
-                    </label>
-                    <select
-                      id="listVisitFilter"
-                      value={listVisitFilter}
-                      onChange={(e) =>
-                        setListVisitFilter(e.target.value as VisitFilterType)
-                      }
-                      className="w-full py-[9px] px-3 rounded-full border border-[#E5E7EB] bg-[#F9FAFB] text-[12px] font-medium text-[#1F2937] outline-none cursor-pointer"
-                    >
-                      <option value="ALL">Select Visit Type</option>
-                      <option value="Appointment">Appointment</option>
-                      <option value="Walk In">Walk In</option>
-                      <option value="VIP_RV">VIP &amp; Repeat Visit (RV)</option>
-                      <option value="AGEING">Ageing &gt; 48 Hrs</option>
-                    </select>
-                  </div>
-                </div>
-
-                {/* Filter Row 2: TML Dealership Filter */}
-                <div className="mb-3.5">
-                  <label
-                    htmlFor="listDealerFilter"
-                    className="block text-[10px] font-bold text-[#9CA3AF] tracking-[0.4px] mb-1.5"
+              <div className="space-y-2.5">
+                {(escalationLogs ?? []).map((log) => (
+                  <div
+                    key={log.id}
+                    className="p-3.5 rounded-xl bg-[#F9FAFB] border border-[#E5E7EB] flex flex-col sm:flex-row sm:items-center justify-between gap-2"
                   >
-                    Filter by Dealership ({(availableDealers ?? []).length} in
-                    Region)
+                    <div>
+                      <div className="flex items-center gap-2 text-xs font-bold text-[#111827] flex-wrap">
+                        <span className="font-mono-tabular">{log.reg}</span>
+                        <span className="text-[#9CA3AF]">·</span>
+                        <span>{log.dealer}</span>
+                        <span className="text-[#9CA3AF]">·</span>
+                        <span className="text-[11px] font-medium text-[#6B7280]">
+                          {log.region}
+                        </span>
+                        <span className="text-[#9CA3AF]">·</span>
+                        <span
+                          className={`text-[11px] font-semibold ${
+                            log.priority === 'Critical'
+                              ? 'text-[#DC2626]'
+                              : 'text-[#D97706]'
+                          }`}
+                        >
+                          {log.priority} Priority
+                        </span>
+                      </div>
+                      <div className="text-xs text-[#4B5563] mt-0.5">
+                        {log.reason}
+                      </div>
+                      <div className="text-[11px] text-[#6B7280] mt-0.5">
+                        Assigned: {log.csmName} · Status: {log.status}
+                      </div>
+                    </div>
+                    <div className="text-[11px] font-mono-tabular text-[#6B7280] shrink-0">
+                      {log.timestamp}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </section>
+          </div>
+        ) : (
+          /* ================= VIEW 2: DRILL-DOWN LIST VIEW & VEHICLE MOVEMENT REGISTER ================= */
+          <div className="space-y-5">
+            {/* Title & Back Button */}
+            <div className="flex items-center justify-between">
+              <h2 className="text-xl font-bold text-[#111827]">
+                {currentCategory}
+              </h2>
+              <button
+                type="button"
+                onClick={closeListView}
+                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-white border border-[#E5E7EB] text-xs font-semibold text-[#111827] hover:bg-gray-50 cursor-pointer"
+              >
+                <ArrowLeft className="w-3.5 h-3.5" />
+                <span>Back to Dashboard</span>
+              </button>
+            </div>
+
+            {/* Category Switcher Tabs */}
+            <div className="flex items-center gap-2 overflow-x-auto pb-1">
+              {(
+                [
+                  'Vehicles Inside Workshop',
+                  'Vehicle Movement Register',
+                  'Gate In',
+                  'Gate Out',
+                  'Road Test Out',
+                  'Road Test In',
+                  'Active Road Tests',
+                ] as VehicleCategory[]
+              ).map((cat) => (
+                <button
+                  key={cat}
+                  type="button"
+                  onClick={() => setCurrentCategory(cat)}
+                  className={`px-4 py-2 rounded-full text-xs font-semibold whitespace-nowrap shrink-0 cursor-pointer transition-colors ${
+                    currentCategory === cat
+                      ? 'bg-black text-white'
+                      : 'bg-white border border-[#E5E7EB] text-[#374151] hover:bg-gray-100'
+                  }`}
+                >
+                  {cat}
+                </button>
+              ))}
+            </div>
+
+            {/* Web Search & Filter Bar */}
+            <div className="bg-white border border-[#E5E7EB] rounded-2xl p-5 shadow-2xs">
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-3.5 items-end">
+                <div className="lg:col-span-4">
+                  <label className="block text-[10px] font-bold text-[#9CA3AF] uppercase mb-1">
+                    Search Vehicle / Chassis / Customer
+                  </label>
+                  <div className="bg-[#F3F4F6] rounded-full px-4 py-2.5 flex items-center gap-2.5">
+                    <Search className="w-4 h-4 text-[#6B7280] shrink-0" />
+                    <input
+                      type="text"
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      placeholder="Search vehicle, VIN or customer"
+                      className="bg-transparent text-xs text-[#111827] outline-none w-full"
+                    />
+                    {searchQuery && (
+                      <button
+                        type="button"
+                        onClick={() => setSearchQuery('')}
+                        className="text-[#6B7280] hover:text-black cursor-pointer"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                <div className="lg:col-span-2">
+                  <label className="block text-[10px] font-bold text-[#9CA3AF] uppercase mb-1">
+                    Filter by Security Guard
                   </label>
                   <select
-                    id="listDealerFilter"
-                    value={listDealerFilter}
-                    onChange={(e) => setListDealerFilter(e.target.value)}
-                    className="w-full py-[9px] px-3 rounded-full border border-[#E5E7EB] bg-[#F9FAFB] text-[12px] font-medium text-[#1F2937] outline-none cursor-pointer"
+                    value={listGuardFilter}
+                    onChange={(e) => setListGuardFilter(e.target.value)}
+                    className="w-full bg-[#F9FAFB] border border-[#E5E7EB] rounded-full px-3.5 py-2.5 text-xs font-medium text-[#1F2937] outline-none cursor-pointer"
                   >
-                    <option value="ALL">All Dealerships</option>
-                    {(availableDealers ?? []).map((dealer) => (
-                      <option key={dealer} value={dealer}>
-                        {dealer}
+                    <option value="ALL">All Guards</option>
+                    {(SECURITY_GUARDS ?? []).map((g) => (
+                      <option key={g} value={g}>
+                        {g}
                       </option>
                     ))}
                   </select>
                 </div>
 
-                <button
-                  type="button"
-                  onClick={() => setSearchQuery((prev) => prev.trim())}
-                  className="w-full bg-black text-white border-none rounded-full py-3 text-[14px] font-semibold cursor-pointer hover:bg-[#1F2937] transition-colors"
-                >
-                  Search
-                </button>
-              </div>
+                <div className="lg:col-span-2">
+                  <label className="block text-[10px] font-bold text-[#9CA3AF] uppercase mb-1">
+                    Filter by Visit Type
+                  </label>
+                  <select
+                    value={listVisitFilter}
+                    onChange={(e) =>
+                      setListVisitFilter(e.target.value as VisitFilterType)
+                    }
+                    className="w-full bg-[#F9FAFB] border border-[#E5E7EB] rounded-full px-3.5 py-2.5 text-xs font-medium text-[#1F2937] outline-none cursor-pointer"
+                  >
+                    <option value="ALL">All Visits</option>
+                    <option value="Appointment">Appointment</option>
+                    <option value="Walk In">Walk In</option>
+                    <option value="VIP_RV">VIP &amp; Repeat Visit (RV)</option>
+                    <option value="AGEING">Ageing &gt; 48 Hrs</option>
+                  </select>
+                </div>
 
-              {/* Vehicle List Meta Header */}
-              <div className="flex justify-between items-center text-[14px] font-bold text-[#111827] mb-3 font-mono-tabular">
-                <span>{selectedDate}</span>
-                <span>
-                  {filteredVehicles.length}{' '}
-                  {isMovementRegisterView ? 'Gate In' : currentCategory}
-                </span>
-              </div>
+                <div className="lg:col-span-2">
+                  <label className="block text-[10px] font-bold text-[#9CA3AF] uppercase mb-1">
+                    Filter by Dealership
+                  </label>
+                  <select
+                    value={listDealerFilter}
+                    onChange={(e) => setListDealerFilter(e.target.value)}
+                    className="w-full bg-[#F9FAFB] border border-[#E5E7EB] rounded-full px-3.5 py-2.5 text-xs font-medium text-[#1F2937] outline-none cursor-pointer"
+                  >
+                    <option value="ALL">All Dealerships</option>
+                    {(availableDealers ?? []).map((d) => (
+                      <option key={d} value={d}>
+                        {d}
+                      </option>
+                    ))}
+                  </select>
+                </div>
 
-              {/* Empty State Handling */}
-              {filteredVehicles.length === 0 ? (
-                <div className="bg-white border border-[#E5E7EB] rounded-[18px] p-6 text-center my-3">
-                  <div className="text-[14px] font-bold text-[#111827] mb-1">
-                    No matching vehicles found
-                  </div>
-                  <div className="text-[12px] text-[#6B7280] mb-4">
-                    No vehicles match the active Zone, Region, Security Guard,
-                    or Visit Type filters.
-                  </div>
+                <div className="lg:col-span-2">
                   <button
                     type="button"
-                    onClick={() => {
-                      setSearchQuery('');
-                      setListDealerFilter('ALL');
-                      setListGuardFilter('ALL');
-                      setListVisitFilter('ALL');
-                      setCurrentSegment('Overall');
-                    }}
-                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-black text-white text-[12px] font-semibold cursor-pointer"
+                    onClick={() => setSearchQuery((prev) => prev.trim())}
+                    className="w-full bg-black text-white rounded-full py-2.5 px-4 text-xs font-semibold cursor-pointer hover:bg-[#1F2937] transition-colors"
                   >
-                    <RotateCcw className="w-3.5 h-3.5" />
-                    <span>Reset All Filters</span>
+                    Search
                   </button>
                 </div>
-              ) : (
-                /* Vehicle Cards List */
-                <div>
-                  {(filteredVehicles ?? []).map((v) => {
-                    const isExpanded = Boolean(expandedVehicleIds[v.id]);
-                    return (
-                      <div
-                        key={v.id}
-                        className="bg-white border border-[#E5E7EB] rounded-[18px] p-4 mb-3 shadow-[0_2px_8px_rgba(0,0,0,0.03)]"
-                      >
-                        <div className="flex items-center justify-between mb-2">
-                          <span className="text-[11px] font-semibold text-[#4B5563] bg-[#F3F4F6] py-[3px] px-2 rounded-[6px] inline-flex items-center gap-1">
+              </div>
+            </div>
+
+            {/* Date & Count Meta Row */}
+            <div className="flex items-center justify-between text-sm font-bold text-[#111827] font-mono-tabular">
+              <span>{selectedDate}</span>
+              <span>
+                {filteredVehicles.length}{' '}
+                {currentCategory === 'Vehicles Inside Workshop'
+                  ? 'Vehicles'
+                  : isMovementRegisterView
+                  ? 'Gate In'
+                  : currentCategory}
+              </span>
+            </div>
+
+            {/* Vehicle Cards Grid (3-Column Web Layout on Desktop) */}
+            {filteredVehicles.length === 0 ? (
+              <div className="bg-white border border-[#E5E7EB] rounded-2xl p-8 text-center">
+                <div className="text-sm font-bold text-[#111827] mb-1">
+                  No matching vehicles found
+                </div>
+                <div className="text-xs text-[#6B7280] mb-4">
+                  No vehicles match the active Zone, Region, Security Guard, or
+                  Visit Type filters.
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSearchQuery('');
+                    setListDealerFilter('ALL');
+                    setListGuardFilter('ALL');
+                    setListVisitFilter('ALL');
+                    setCurrentSegment('Overall');
+                  }}
+                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-black text-white text-xs font-semibold cursor-pointer"
+                >
+                  <RotateCcw className="w-3.5 h-3.5" />
+                  <span>Reset Filters</span>
+                </button>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {(filteredVehicles ?? []).map((v) => {
+                  const isExpanded = Boolean(expandedVehicleIds[v.id]);
+                  return (
+                    <div
+                      key={v.id}
+                      className="bg-white border border-[#E5E7EB] rounded-2xl p-4 shadow-2xs flex flex-col justify-between"
+                    >
+                      <div>
+                        {/* Dealership & Region Tag */}
+                        <div className="flex items-center justify-between mb-2.5">
+                          <span className="text-[11px] font-semibold text-[#4B5563] bg-[#F3F4F6] py-1 px-2.5 rounded-lg inline-flex items-center gap-1">
                             <Building2 className="w-3 h-3 text-[#6B7280]" />
                             <span>{v.dealer}</span>
                           </span>
@@ -1557,51 +1665,48 @@ export default function App() {
                           </span>
                         </div>
 
+                        {/* Main Vehicle Row */}
                         <div className="flex justify-between items-start gap-2">
                           <div>
-                            <div className="text-[16px] font-bold text-[#111827] mb-0.5 font-mono-tabular">
+                            <div className="text-base font-bold text-[#111827] font-mono-tabular">
                               {v.reg}
                             </div>
-                            <div className="text-[12px] font-medium text-[#6B7280] mb-1 break-all font-mono-tabular">
+                            <div className="text-xs text-[#6B7280] mt-0.5 break-all font-mono-tabular">
                               {v.vin}
                             </div>
-                            <div className="text-[12px] font-medium text-[#6B7280] mb-0.5">
+                            <div className="text-xs text-[#6B7280] mt-1">
                               {v.model}
                             </div>
-                            <div className="text-[13px] font-semibold text-[#111827]">
+                            <div className="text-xs font-semibold text-[#111827] mt-1">
                               {v.customer}
                             </div>
                           </div>
 
-                          <div className="flex flex-col items-end">
+                          <div className="text-right flex flex-col items-end">
                             <div className="flex items-center gap-1.5 flex-wrap justify-end">
                               {v.rv && (
-                                <span
-                                  title="Repeat Visit Vehicle"
-                                  className="w-7 h-7 rounded-full bg-[#F59E0B] text-white text-[11px] font-bold inline-flex items-center justify-center shrink-0"
-                                >
+                                <span className="w-7 h-7 rounded-full bg-[#F59E0B] text-white text-[11px] font-bold inline-flex items-center justify-center">
                                   RV
                                 </span>
                               )}
                               <span
-                                className={`py-1 px-3 rounded-full text-[12px] font-medium whitespace-nowrap shrink-0 ${
+                                className={`px-3 py-1 rounded-full text-xs font-medium border ${
                                   v.visitType === 'Appointment'
-                                    ? 'border border-[#10B981] text-[#059669] bg-[#ECFDF5]'
-                                    : 'border border-[#93C5FD] text-[#3B82F6] bg-[#EFF6FF]'
+                                    ? 'border-[#10B981] text-[#059669] bg-[#ECFDF5]'
+                                    : 'border-[#93C5FD] text-[#3B82F6] bg-[#EFF6FF]'
                                 }`}
                               >
                                 {v.visitType}
                               </span>
                               {v.vip && (
-                                <span className="py-1 px-3 rounded-full text-[12px] font-semibold border border-[#A855F7] text-[#9333EA] bg-[#FAF5FF] whitespace-nowrap shrink-0">
+                                <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold border border-[#A855F7] text-[#9333EA] bg-[#FAF5FF]">
                                   VIP
                                 </span>
                               )}
                               <button
                                 type="button"
                                 onClick={() => toggleAuditDrawer(v.id)}
-                                aria-label="Toggle Vehicle Movement & Audit Details"
-                                className="bg-transparent border-none text-[#374151] cursor-pointer p-1 hover:bg-[#F3F4F6] rounded-full transition-colors"
+                                className="p-1 text-[#374151] hover:bg-gray-100 rounded-full cursor-pointer"
                               >
                                 {isExpanded ? (
                                   <ChevronUp className="w-4 h-4" />
@@ -1611,603 +1716,182 @@ export default function App() {
                               </button>
                             </div>
 
-                            <div className="text-right mt-2">
-                              <div className="text-[12px] text-[#374151] font-medium">
-                                Road Test Count:{' '}
-                                <strong className="font-bold text-[#111827] font-mono-tabular">
-                                  {v.roadTestCount}
-                                </strong>
-                              </div>
-                              {v.dwellLabel && !isMovementRegisterView && (
-                                <div className="text-[12px] text-[#6B7280] mt-0.5">
-                                  {v.dwellLabel}{' '}
-                                  <strong
-                                    className={`font-bold font-mono-tabular ${
-                                      v.slaBreach
-                                        ? 'text-[#DC2626]'
-                                        : 'text-[#111827]'
-                                    }`}
-                                  >
-                                    {v.dwellVal}
-                                  </strong>
-                                </div>
-                              )}
+                            <div className="text-xs text-[#374151] font-medium mt-2">
+                              Road Test Count:{' '}
+                              <strong className="font-bold text-[#111827] font-mono-tabular">
+                                {v.roadTestCount}
+                              </strong>
                             </div>
+
+                            {v.dwellLabel && !isMovementRegisterView && (
+                              <div className="text-xs text-[#6B7280] mt-1">
+                                {v.dwellLabel}{' '}
+                                <span
+                                  className={`font-bold font-mono-tabular ${
+                                    v.slaBreach
+                                      ? 'text-[#DC2626]'
+                                      : 'text-[#111827]'
+                                  }`}
+                                >
+                                  {v.dwellVal}
+                                </span>
+                              </div>
+                            )}
                           </div>
                         </div>
 
-                        {/* Bottom Dual Timestamp Row */}
+                        {/* Bottom Dual Timestamp Row (Gate In Time & Gate Out / Event Time) */}
                         <div className="mt-3 pt-2.5 border-t border-[#F3F4F6] flex items-center justify-between gap-2">
                           <div>
                             <div className="text-[11px] text-[#6B7280]">
                               Gate In Time
                             </div>
-                            <div className="text-[12px] font-bold text-[#1F2937] font-mono-tabular">
+                            <div className="text-xs font-bold text-[#1F2937] font-mono-tabular">
                               {v.gateInTime}
                             </div>
                           </div>
 
                           <div className="text-right">
-                            <div className="text-[11px] text-[#6B7280]">
-                              {isMovementRegisterView
-                                ? 'Gate Out Time'
-                                : v.timeLabel}
+                            <div className="flex items-center justify-end gap-1 text-[11px] text-[#6B7280]">
+                              {currentCategory !== 'Vehicles Inside Workshop' &&
+                                currentCategory !== 'Active Road Tests' && (
+                                  <UserCheck className="w-3.5 h-3.5 text-[#6B7280]" />
+                                )}
+                              <span>
+                                {isMovementRegisterView
+                                  ? 'Gate Out Time'
+                                  : v.timeLabel}
+                              </span>
                             </div>
-                            <div className="text-[12px] font-bold text-[#1F2937] font-mono-tabular">
+                            <div className="text-xs font-bold text-[#1F2937] font-mono-tabular">
                               {isMovementRegisterView
                                 ? v.gateOutTime
                                 : v.timeVal}
                             </div>
                           </div>
                         </div>
+                      </div>
 
-                        {/* Expandable TML & Security Guard Movement Register Drawer */}
-                        {isExpanded && (
-                          <div className="mt-3 pt-3 border-t border-dashed border-[#E5E7EB] text-[12px]">
-                            <div className="grid grid-cols-2 gap-2 bg-[#F9FAFB] p-2.5 rounded-[10px] mb-2.5">
-                              <div>
-                                <span className="block text-[10px] text-[#6B7280]">
-                                  Security Guard
+                      {/* Expandable TML & Security Guard Audit Drawer */}
+                      {isExpanded && (
+                        <div className="mt-3 pt-3 border-t border-dashed border-[#E5E7EB] text-xs">
+                          <div className="grid grid-cols-2 gap-2 bg-[#F9FAFB] p-2.5 rounded-xl mb-2.5">
+                            <div>
+                              <span className="block text-[10px] text-[#6B7280]">
+                                Security Guard
+                              </span>
+                              <strong className="text-[#111827]">
+                                {v.securityGuard}
+                              </strong>
+                            </div>
+                            <div>
+                              <span className="block text-[10px] text-[#6B7280]">
+                                Gate Entry Mode
+                              </span>
+                              <strong className="text-[#111827]">
+                                {v.entryMode}
+                              </strong>
+                            </div>
+                            <div>
+                              <span className="block text-[10px] text-[#6B7280]">
+                                Assigned Staff
+                              </span>
+                              <strong className="text-[#111827]">{v.sa}</strong>
+                            </div>
+                            <div>
+                              <span className="block text-[10px] text-[#6B7280]">
+                                TML Territory CSM
+                              </span>
+                              <strong className="text-[#111827]">
+                                {v.csmName}
+                              </strong>
+                            </div>
+                          </div>
+
+                          {(v.roadTestTrips ?? []).length > 0 && (
+                            <div className="mb-2.5 bg-[#F9FAFB] p-2.5 rounded-xl border border-[#E5E7EB]">
+                              <div className="text-[11px] font-bold text-[#374151] mb-1.5 flex items-center justify-between">
+                                <span>
+                                  Road Test Movement Log ({v.roadTestCount}{' '}
+                                  Trips)
                                 </span>
-                                <strong className="text-[#111827] text-[12px]">
-                                  {v.securityGuard}
-                                </strong>
+                                <span className="text-[10px] font-mono-tabular text-[#6B7280]">
+                                  {v.jobCardNo}
+                                </span>
                               </div>
-                              <div>
-                                <span className="block text-[10px] text-[#6B7280]">
-                                  Gate Entry Mode
-                                </span>
-                                <strong className="text-[#111827] text-[12px]">
-                                  {v.entryMode}
-                                </strong>
-                              </div>
-                              <div>
-                                <span className="block text-[10px] text-[#6B7280]">
-                                  Assigned Staff
-                                </span>
-                                <strong className="text-[#111827] text-[12px]">
-                                  {v.sa}
-                                </strong>
-                              </div>
-                              <div>
-                                <span className="block text-[10px] text-[#6B7280]">
-                                  TML Territory CSM
-                                </span>
-                                <strong className="text-[#111827] text-[12px]">
-                                  {v.csmName}
-                                </strong>
+                              <div className="space-y-1.5">
+                                {(v.roadTestTrips ?? []).map((trip) => (
+                                  <div
+                                    key={trip.tripNo}
+                                    className="bg-white px-2.5 py-1.5 rounded-lg border border-[#E5E7EB] flex items-center justify-between text-[11px]"
+                                  >
+                                    <div>
+                                      <span className="font-bold text-[#111827]">
+                                        RT #{trip.tripNo}
+                                      </span>{' '}
+                                      <span className="text-[#6B7280]">
+                                        · {trip.driver}
+                                      </span>
+                                      <div className="text-[10px] text-[#6B7280] font-mono-tabular">
+                                        Out:{' '}
+                                        {trip.outTime.split('|')[1]?.trim() ??
+                                          trip.outTime}{' '}
+                                        → In:{' '}
+                                        {trip.inTime.includes('|')
+                                          ? trip.inTime.split('|')[1]?.trim()
+                                          : trip.inTime}
+                                      </div>
+                                    </div>
+                                    <span className="font-mono-tabular font-semibold text-[#374151]">
+                                      {trip.duration}
+                                    </span>
+                                  </div>
+                                ))}
                               </div>
                             </div>
+                          )}
 
-                            {(v.roadTestTrips ?? []).length > 0 && (
-                              <div className="mb-2.5 bg-[#F9FAFB] p-2.5 rounded-[10px] border border-[#E5E7EB]">
-                                <div className="text-[11px] font-bold text-[#374151] mb-1.5 flex items-center justify-between">
-                                  <span>
-                                    Road Test Movement Log ({v.roadTestCount}{' '}
-                                    Trips)
-                                  </span>
-                                  <span className="text-[10px] font-mono-tabular text-[#6B7280]">
-                                    {v.jobCardNo}
-                                  </span>
-                                </div>
-                                <div className="space-y-1.5">
-                                  {(v.roadTestTrips ?? []).map((trip) => (
-                                    <div
-                                      key={trip.tripNo}
-                                      className="bg-white px-2.5 py-1.5 rounded-lg border border-[#E5E7EB] flex items-center justify-between text-[11px]"
-                                    >
-                                      <div>
-                                        <span className="font-bold text-[#111827]">
-                                          RT #{trip.tripNo}
-                                        </span>{' '}
-                                        <span className="text-[#6B7280]">
-                                          · {trip.driver}
-                                        </span>
-                                        <div className="text-[10px] text-[#6B7280] font-mono-tabular">
-                                          Out:{' '}
-                                          {trip.outTime.split('|')[1]?.trim() ??
-                                            trip.outTime}{' '}
-                                          → In:{' '}
-                                          {trip.inTime.includes('|')
-                                            ? trip.inTime.split('|')[1]?.trim()
-                                            : trip.inTime}
-                                        </div>
-                                      </div>
-                                      <span className="font-mono-tabular font-semibold text-[#374151]">
-                                        {trip.duration}
-                                      </span>
-                                    </div>
-                                  ))}
-                                </div>
-                              </div>
-                            )}
-
-                            {v.escalatedAt ? (
-                              <div className="w-full bg-[#ECFDF5] border border-[#10B981] text-[#065F46] rounded-xl p-2.5 flex items-center justify-between gap-2">
-                                <div className="flex items-center gap-2">
-                                  <CheckCircle2 className="w-4 h-4 text-[#059669] shrink-0" />
-                                  <div>
-                                    <div className="text-[11px] font-bold">
-                                      Escalated to Dealership CSM ({v.escalatedAt})
-                                    </div>
-                                    <div className="text-[11px] text-[#047857]">
-                                      {v.escalationNote}
-                                    </div>
+                          {v.escalatedAt ? (
+                            <div className="w-full bg-[#ECFDF5] border border-[#10B981] text-[#065F46] rounded-xl p-2.5 flex items-center justify-between gap-2">
+                              <div className="flex items-center gap-2">
+                                <CheckCircle2 className="w-4 h-4 text-[#059669] shrink-0" />
+                                <div>
+                                  <div className="text-[11px] font-bold">
+                                    Escalated to CSM ({v.escalatedAt})
+                                  </div>
+                                  <div className="text-[11px] text-[#047857]">
+                                    {v.escalationNote}
                                   </div>
                                 </div>
-                                <button
-                                  type="button"
-                                  onClick={() => handleInitiateEscalation(v)}
-                                  className="text-[11px] font-semibold underline cursor-pointer shrink-0"
-                                >
-                                  Update
-                                </button>
                               </div>
-                            ) : (
                               <button
                                 type="button"
                                 onClick={() => handleInitiateEscalation(v)}
-                                className="w-full bg-[#007AFF] hover:bg-[#0062CC] text-white border-none rounded-full py-[9px] px-4 text-[12px] font-semibold cursor-pointer transition-colors flex items-center justify-center gap-1.5"
+                                className="text-[11px] font-semibold underline cursor-pointer shrink-0"
                               >
-                                <Send className="w-3.5 h-3.5" />
-                                <span>Escalate Delay to Dealership CSM</span>
+                                Update
                               </button>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* ================= BOTTOM NAVIGATION BAR MATCHING SCREENSHOT ================= */}
-          <nav
-            aria-label="Mobile Bottom Navigation"
-            className="border-t border-[#E5E7EB] bg-white px-2 pt-2 pb-3 grid grid-cols-5 items-center shrink-0"
-          >
-            <button
-              type="button"
-              onClick={() => setActiveView('home')}
-              className={`flex flex-col items-center justify-center gap-1 py-1 cursor-pointer transition-colors ${
-                activeView === 'home'
-                  ? 'text-[#111827] font-bold'
-                  : 'text-[#6B7280] hover:text-[#111827]'
-              }`}
-            >
-              <Home
-                className="w-5 h-5"
-                strokeWidth={activeView === 'home' ? 2.4 : 1.8}
-              />
-              <span className="text-[10px]">Home</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => openListView('Vehicle Movement Register')}
-              className={`flex flex-col items-center justify-center gap-1 py-1 cursor-pointer transition-colors ${
-                activeView === 'list' &&
-                (currentCategory === 'Vehicle Movement Register' ||
-                  currentCategory === 'Gate In')
-                  ? 'text-[#111827] font-bold'
-                  : 'text-[#6B7280] hover:text-[#111827]'
-              }`}
-            >
-              <Car
-                className="w-5 h-5"
-                strokeWidth={
-                  activeView === 'list' &&
-                  (currentCategory === 'Vehicle Movement Register' ||
-                    currentCategory === 'Gate In')
-                    ? 2.4
-                    : 1.8
-                }
-              />
-              <span className="text-[10px]">Gate In</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => openListView('Gate Out')}
-              className={`flex flex-col items-center justify-center gap-1 py-1 cursor-pointer transition-colors ${
-                activeView === 'list' && currentCategory === 'Gate Out'
-                  ? 'text-[#111827] font-bold'
-                  : 'text-[#6B7280] hover:text-[#111827]'
-              }`}
-            >
-              <Building2
-                className="w-5 h-5"
-                strokeWidth={
-                  activeView === 'list' && currentCategory === 'Gate Out'
-                    ? 2.4
-                    : 1.8
-                }
-              />
-              <span className="text-[10px]">Gate Out</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => openListView('Road Test Out')}
-              className={`flex flex-col items-center justify-center gap-1 py-1 cursor-pointer transition-colors ${
-                activeView === 'list' && currentCategory === 'Road Test Out'
-                  ? 'text-[#111827] font-bold'
-                  : 'text-[#6B7280] hover:text-[#111827]'
-              }`}
-            >
-              <LogOut
-                className="w-5 h-5"
-                strokeWidth={
-                  activeView === 'list' && currentCategory === 'Road Test Out'
-                    ? 2.4
-                    : 1.8
-                }
-              />
-              <span className="text-[10px]">RT Out</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => openListView('Road Test In')}
-              className={`flex flex-col items-center justify-center gap-1 py-1 cursor-pointer transition-colors ${
-                activeView === 'list' && currentCategory === 'Road Test In'
-                  ? 'text-[#111827] font-bold'
-                  : 'text-[#6B7280] hover:text-[#111827]'
-              }`}
-            >
-              <LogIn
-                className="w-5 h-5"
-                strokeWidth={
-                  activeView === 'list' && currentCategory === 'Road Test In'
-                    ? 2.4
-                    : 1.8
-                }
-              />
-              <span className="text-[10px]">RT In</span>
-            </button>
-          </nav>
-        </div>
-
-        {/* ================= DESKTOP COMPANION: PAN-INDIA ZONES, REGIONS & MOVEMENT COMMAND PANEL ================= */}
-        <aside className="w-full lg:flex-1 max-w-[412px] lg:max-w-none flex flex-col gap-5">
-          {/* Top Regional Summary Header Card */}
-          <div className="bg-white rounded-[24px] border border-[#E5E7EB] p-6 shadow-[0_4px_20px_rgba(0,0,0,0.04)]">
-            <div className="flex flex-wrap items-center justify-between gap-4 pb-4 mb-5 border-b border-[#E5E7EB]">
-              <div>
-                <div className="text-[12px] font-semibold text-[#6B7280] mb-1">
-                  Tata Motors Passenger &amp; Electric Vehicles · Pan-India
-                  Governance
-                </div>
-                <h1 className="text-[22px] font-bold text-[#111827] tracking-tight">
-                  TML Security, Reception &amp; Movement Register
-                </h1>
-              </div>
-
-              <div className="flex items-center gap-2 flex-wrap">
-                <button
-                  type="button"
-                  onClick={isDemoPlaying ? handleStopDemo : handleStartDemo}
-                  className={`px-4 py-2 rounded-xl text-[12px] font-bold inline-flex items-center gap-1.5 cursor-pointer transition-colors ${
-                    isDemoPlaying
-                      ? 'bg-[#DC2626] text-white hover:bg-[#B91C1C]'
-                      : 'bg-[#007AFF] text-white hover:bg-[#0062CC]'
-                  }`}
-                >
-                  {isDemoPlaying ? (
-                    <>
-                      <Pause className="w-3.5 h-3.5" />
-                      <span>Stop Auto-Demo</span>
-                    </>
-                  ) : (
-                    <>
-                      <Play className="w-3.5 h-3.5" />
-                      <span>Play Guided Demo Tour</span>
-                    </>
-                  )}
-                </button>
-
-                <div className="flex items-center gap-2 text-[12px] font-semibold text-[#374151] bg-[#F3F4F6] px-3.5 py-2 rounded-xl font-mono-tabular">
-                  <span>Zone:</span>
-                  <strong className="text-[#111827]">{selectedZone}</strong>
-                  <span>·</span>
-                  <span>
-                    {selectedRegion === 'ALL' ? 'All Regions' : selectedRegion}
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            {/* Interactive Pan-India Zone Selector Pills */}
-            <div className="mb-4">
-              <div className="text-[11px] font-bold text-[#6B7280] mb-2">
-                Select TML Zone (All 5 Pan-India Zones)
-              </div>
-              <div className="flex flex-wrap gap-1.5">
-                {(TML_ZONES ?? []).map((z) => (
-                  <button
-                    key={z.id}
-                    type="button"
-                    onClick={() => handleZoneChange(z.id)}
-                    className={`px-3 py-1.5 rounded-xl text-[12px] font-semibold cursor-pointer transition-colors ${
-                      selectedZone === z.id
-                        ? 'bg-[#111827] text-white'
-                        : 'bg-[#F3F4F6] text-[#374151] hover:bg-[#E5E7EB]'
-                    }`}
-                  >
-                    {z.id === 'ALL' ? 'Pan-India (All 5 Zones)' : `${z.id} Zone`}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Interactive Region Selector Pills for Selected Zone */}
-            <div className="mb-5">
-              <div className="text-[11px] font-bold text-[#6B7280] mb-2">
-                Regional Offices ({(availableRegions ?? []).length} Regions in
-                Scope)
-              </div>
-              <div className="flex flex-wrap gap-1.5">
-                <button
-                  type="button"
-                  onClick={() => handleRegionChange('ALL')}
-                  className={`px-3 py-1.5 rounded-xl text-[11px] font-semibold cursor-pointer transition-colors ${
-                    selectedRegion === 'ALL'
-                      ? 'bg-[#007AFF] text-white'
-                      : 'bg-[#F9FAFB] border border-[#E5E7EB] text-[#374151] hover:bg-[#F3F4F6]'
-                  }`}
-                >
-                  All Regions ({(availableRegions ?? []).length})
-                </button>
-                {(availableRegions ?? []).map((reg) => (
-                  <button
-                    key={reg.id}
-                    type="button"
-                    onClick={() => handleRegionChange(reg.id)}
-                    className={`px-3 py-1.5 rounded-xl text-[11px] font-semibold cursor-pointer transition-colors ${
-                      selectedRegion === reg.id
-                        ? 'bg-[#007AFF] text-white'
-                        : 'bg-[#F9FAFB] border border-[#E5E7EB] text-[#374151] hover:bg-[#F3F4F6]'
-                    }`}
-                  >
-                    {reg.name}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Quick Interactive KPI Strip Synced with Mobile Frame */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <div className="p-3.5 rounded-2xl bg-[#F9FAFB] border border-[#E5E7EB]">
-                <div className="text-[11px] font-medium text-[#6B7280] mb-1">
-                  Vehicle Movement Register
-                </div>
-                <div className="flex items-baseline justify-between">
-                  <span className="text-[22px] font-bold text-[#111827] font-mono-tabular">
-                    {computedKpis.movementRegisterCount}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => openListView('Vehicle Movement Register')}
-                    className="text-[11px] font-semibold text-[#007AFF] hover:underline cursor-pointer inline-flex items-center gap-0.5"
-                  >
-                    <span>Open Register</span>
-                    <ArrowUpRight className="w-3 h-3" />
-                  </button>
-                </div>
-              </div>
-
-              <div className="p-3.5 rounded-2xl bg-[#F9FAFB] border border-[#E5E7EB]">
-                <div className="text-[11px] font-medium text-[#6B7280] mb-1">
-                  Workshop Dwell &gt; 48h Breaches
-                </div>
-                <div className="flex items-baseline justify-between">
-                  <span className="text-[22px] font-bold text-[#DC2626] font-mono-tabular">
-                    {computedKpis.ageingCount}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      openListView('Vehicles Inside Workshop', 'AGEING')
-                    }
-                    className="text-[11px] font-semibold text-[#007AFF] hover:underline cursor-pointer inline-flex items-center gap-0.5"
-                  >
-                    <span>Inspect</span>
-                    <ArrowUpRight className="w-3 h-3" />
-                  </button>
-                </div>
-              </div>
-
-              <div className="p-3.5 rounded-2xl bg-[#F9FAFB] border border-[#E5E7EB]">
-                <div className="text-[11px] font-medium text-[#6B7280] mb-1">
-                  RFID Auto-Gate Compliance
-                </div>
-                <div className="flex items-baseline justify-between">
-                  <span className="text-[22px] font-bold text-[#059669] font-mono-tabular">
-                    {computedKpis.rfidCompliance}
-                  </span>
-                  <span className="text-[11px] font-semibold text-[#6B7280]">
-                    Target ≥ 90%
-                  </span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Dealership RFID & Workshop SLA Governance Matrix across Zones & Regions */}
-          <div className="bg-white rounded-[24px] border border-[#E5E7EB] p-6 shadow-[0_4px_20px_rgba(0,0,0,0.04)]">
-            <div className="flex items-center justify-between mb-4">
-              <div>
-                <h2 className="text-[16px] font-bold text-[#111827]">
-                  Zone &amp; Regional Dealership Compliance Matrix
-                </h2>
-                <p className="text-[12px] text-[#6B7280]">
-                  Click any dealership row to open its Vehicle Movement Register
-                  in the mobile frame
-                </p>
-              </div>
-              {selectedDealer !== 'ALL' && (
-                <button
-                  type="button"
-                  onClick={() => handleHomeDealerChange('ALL')}
-                  className="text-[12px] font-semibold text-[#007AFF] hover:underline cursor-pointer"
-                >
-                  Show All ({(scopedComplianceList ?? []).length})
-                </button>
-              )}
-            </div>
-
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse">
-                <thead>
-                  <tr className="border-b border-[#E5E7EB] text-[11px] font-semibold text-[#6B7280]">
-                    <th className="py-2.5 pr-3">Dealership &amp; Region</th>
-                    <th className="py-2.5 px-3 text-right">Auto RFID</th>
-                    <th className="py-2.5 px-3 text-right">Manual Scan</th>
-                    <th className="py-2.5 px-3 text-right">Compliance</th>
-                    <th className="py-2.5 pl-3 text-right">SLA Breaches</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-[#F3F4F6] text-[13px]">
-                  {(scopedComplianceList ?? []).map((row) => {
-                    const isSelected = selectedDealer === row.dealer;
-                    return (
-                      <tr
-                        key={row.dealer}
-                        onClick={() => {
-                          handleHomeDealerChange(row.dealer);
-                          openListView('Vehicle Movement Register');
-                        }}
-                        className={`cursor-pointer transition-colors ${
-                          isSelected
-                            ? 'bg-[#EFF6FF]/70 font-semibold'
-                            : 'hover:bg-[#F9FAFB]'
-                        }`}
-                      >
-                        <td className="py-3 pr-3">
-                          <div className="font-semibold text-[#111827]">
-                            {row.dealer}
-                          </div>
-                          <div className="text-[11px] text-[#6B7280]">
-                            {row.zone} Zone · {row.region} · CSM: {row.csmLead}
-                          </div>
-                        </td>
-                        <td className="py-3 px-3 text-right font-mono-tabular text-[#111827]">
-                          {row.rfidAutoCount}
-                        </td>
-                        <td className="py-3 px-3 text-right font-mono-tabular text-[#6B7280]">
-                          {row.manualScanCount}
-                        </td>
-                        <td className="py-3 px-3 text-right font-mono-tabular">
-                          <span
-                            className={`font-bold ${
-                              row.compliancePct >= 90
-                                ? 'text-[#059669]'
-                                : 'text-[#D97706]'
-                            }`}
-                          >
-                            {row.compliancePct}%
-                          </span>
-                        </td>
-                        <td className="py-3 pl-3 text-right font-mono-tabular">
-                          <span
-                            className={`font-bold ${
-                              row.slaBreachCount > 0
-                                ? 'text-[#DC2626]'
-                                : 'text-[#6B7280]'
-                            }`}
-                          >
-                            {padTwoDigits(row.slaBreachCount)}
-                          </span>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-          {/* Live CSM Escalation Audit Log */}
-          <div className="bg-white rounded-[24px] border border-[#E5E7EB] p-6 shadow-[0_4px_20px_rgba(0,0,0,0.04)]">
-            <div className="flex items-center justify-between mb-4">
-              <div>
-                <h2 className="text-[16px] font-bold text-[#111827]">
-                  CSM &amp; Dealer GM Escalation Log
-                </h2>
-                <p className="text-[12px] text-[#6B7280]">
-                  Real-time audit trail of SLA delay escalations triggered from
-                  vehicle cards
-                </p>
-              </div>
-              <span className="text-[12px] font-mono-tabular font-semibold text-[#4B5563]">
-                {(escalationLogs ?? []).length} Dispatched
-              </span>
-            </div>
-
-            <div className="space-y-3">
-              {(escalationLogs ?? []).map((log) => (
-                <div
-                  key={log.id}
-                  className="p-3.5 rounded-2xl bg-[#F9FAFB] border border-[#E5E7EB] flex flex-col sm:flex-row sm:items-center justify-between gap-2"
-                >
-                  <div>
-                    <div className="flex items-center gap-2 text-[13px] font-bold text-[#111827] flex-wrap">
-                      <span className="font-mono-tabular">{log.reg}</span>
-                      <span className="text-[#9CA3AF]">·</span>
-                      <span>{log.dealer}</span>
-                      <span className="text-[#9CA3AF]">·</span>
-                      <span className="text-[11px] font-medium text-[#6B7280]">
-                        {log.region}
-                      </span>
-                      <span className="text-[#9CA3AF]">·</span>
-                      <span
-                        className={`text-[11px] font-semibold ${
-                          log.priority === 'Critical'
-                            ? 'text-[#DC2626]'
-                            : 'text-[#D97706]'
-                        }`}
-                      >
-                        {log.priority} Priority
-                      </span>
+                            </div>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => handleInitiateEscalation(v)}
+                              className="w-full bg-[#007AFF] hover:bg-[#0062CC] text-white rounded-full py-2.5 px-4 text-xs font-semibold cursor-pointer transition-colors flex items-center justify-center gap-1.5"
+                            >
+                              <Send className="w-3.5 h-3.5" />
+                              <span>Escalate Delay to Dealership CSM</span>
+                            </button>
+                          )}
+                        </div>
+                      )}
                     </div>
-                    <div className="text-[12px] text-[#4B5563] mt-0.5">
-                      {log.reason}
-                    </div>
-                    <div className="text-[11px] text-[#6B7280] mt-1">
-                      Assigned: {log.csmName} · Status: {log.status}
-                    </div>
-                  </div>
-                  <div className="text-[11px] font-mono-tabular text-[#6B7280] shrink-0">
-                    {log.timestamp}
-                  </div>
-                </div>
-              ))}
-            </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
-        </aside>
-      </div>
+        )}
+      </main>
 
       {/* ================= ESCALATION CONFIRMATION MODAL ================= */}
       {escalatingVehicle && (
@@ -2215,22 +1899,18 @@ export default function App() {
           className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4"
           role="dialog"
           aria-modal="true"
-          aria-labelledby="escalate-modal-title"
         >
-          <div className="bg-white w-full max-w-[400px] rounded-[24px] p-5 shadow-2xl border border-[#E5E7EB]">
+          <div className="bg-white w-full max-w-[420px] rounded-2xl p-5 shadow-2xl border border-[#E5E7EB]">
             <div className="flex items-start justify-between gap-3 mb-3">
               <div className="flex items-center gap-2.5">
                 <div className="w-9 h-9 rounded-full bg-[#EFF6FF] text-[#007AFF] flex items-center justify-center shrink-0">
                   <ShieldAlert className="w-5 h-5" />
                 </div>
                 <div>
-                  <h3
-                    id="escalate-modal-title"
-                    className="text-[15px] font-bold text-[#111827]"
-                  >
+                  <h3 className="text-sm font-bold text-[#111827]">
                     Escalate Delay to Dealership CSM
                   </h3>
-                  <p className="text-[12px] text-[#6B7280]">
+                  <p className="text-xs text-[#6B7280]">
                     {escalatingVehicle.dealer} ({escalatingVehicle.region})
                   </p>
                 </div>
@@ -2239,14 +1919,13 @@ export default function App() {
                 type="button"
                 onClick={() => setEscalatingVehicle(null)}
                 className="p-1 text-[#6B7280] hover:text-black cursor-pointer"
-                aria-label="Close modal"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
             <form onSubmit={handleConfirmEscalation}>
-              <div className="bg-[#F9FAFB] rounded-xl p-3 border border-[#E5E7EB] mb-3.5 text-[12px] space-y-1">
+              <div className="bg-[#F9FAFB] rounded-xl p-3 border border-[#E5E7EB] mb-3.5 text-xs space-y-1">
                 <div className="flex justify-between">
                   <span className="text-[#6B7280]">Vehicle Reg / Model:</span>
                   <strong className="text-[#111827] font-mono-tabular">
@@ -2277,7 +1956,7 @@ export default function App() {
                       key={level}
                       type="button"
                       onClick={() => setEscalationPriority(level)}
-                      className={`py-2 px-3 rounded-xl text-[12px] font-semibold border cursor-pointer transition-colors ${
+                      className={`py-2 px-3 rounded-xl text-xs font-semibold border cursor-pointer transition-colors ${
                         escalationPriority === level
                           ? level === 'Critical'
                             ? 'bg-[#FEF2F2] border-[#DC2626] text-[#DC2626]'
@@ -2292,19 +1971,14 @@ export default function App() {
               </div>
 
               <div className="mb-4">
-                <label
-                  htmlFor="escalationNote"
-                  className="block text-[11px] font-bold text-[#374151] mb-1.5"
-                >
+                <label className="block text-[11px] font-bold text-[#374151] mb-1.5">
                   Action Directive for Dealer GM &amp; CSM
                 </label>
                 <textarea
-                  id="escalationNote"
                   rows={3}
                   value={escalationNoteInput}
                   onChange={(e) => setEscalationNoteInput(e.target.value)}
-                  className="w-full rounded-xl border border-[#D1D5DB] bg-[#F9FAFB] p-2.5 text-[12px] text-[#111827] outline-none focus:border-[#007AFF]"
-                  placeholder="Enter escalation remarks..."
+                  className="w-full rounded-xl border border-[#D1D5DB] bg-[#F9FAFB] p-2.5 text-xs text-[#111827] outline-none focus:border-[#007AFF]"
                 />
               </div>
 
@@ -2312,13 +1986,13 @@ export default function App() {
                 <button
                   type="button"
                   onClick={() => setEscalatingVehicle(null)}
-                  className="flex-1 py-2.5 px-4 rounded-full border border-[#D1D5DB] bg-white text-[13px] font-semibold text-[#374151] cursor-pointer hover:bg-[#F3F4F6]"
+                  className="flex-1 py-2.5 px-4 rounded-full border border-[#D1D5DB] bg-white text-xs font-semibold text-[#374151] cursor-pointer hover:bg-[#F3F4F6]"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 py-2.5 px-4 rounded-full border-none bg-[#007AFF] hover:bg-[#0062CC] text-white text-[13px] font-semibold cursor-pointer"
+                  className="flex-1 py-2.5 px-4 rounded-full bg-[#007AFF] hover:bg-[#0062CC] text-white text-xs font-semibold cursor-pointer"
                 >
                   Dispatch Escalation
                 </button>
